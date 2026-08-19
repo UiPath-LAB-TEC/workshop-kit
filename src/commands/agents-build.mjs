@@ -10,6 +10,10 @@
  * below it in the same file. `build` rewrites only what is between the markers;
  * `check` fails when they diverge.
  *
+ * Scope: the repo root only. A workshop's downloads/ may contain its own
+ * AGENTS.md as teaching content; that belongs to the zip pipeline and is never
+ * touched here.
+ *
  * A single file, rather than a generated AGENTS.md plus a hand-written
  * AGENTS.product.md, because two files that look alike invite editing the one
  * whose contents are about to be overwritten.

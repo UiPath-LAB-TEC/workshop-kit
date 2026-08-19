@@ -33,5 +33,19 @@
   ],
   "engines": {
     "node": ">=20.0"
+  },
+  "dependencies": {
+    "prism-react-renderer": "^2.3.0",
+    "clsx": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/types": "3.10.1",
+    "typescript": "~6.0.2"
   }
 }

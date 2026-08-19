@@ -104,6 +104,10 @@ for (const folderName of downloadFolders) {
 
   rmSync(zipPath, {force: true});
   cpSync(sourceDir, stagedSourceDir, {recursive: true});
+  // Workshop CONTENT, not infrastructure: participants download a project
+  // repository which itself contains an agent file, because these workshops teach
+  // coding agents. Unrelated to the repo-root AGENTS.md that `agents build`
+  // manages, and this only ever rewrites the staged copy, never the source.
   renderWorkshopTemplate(join(stagedSourceDir, 'AGENTS.md'));
 
   const {command, args} = archiveCommand(zipPath);
