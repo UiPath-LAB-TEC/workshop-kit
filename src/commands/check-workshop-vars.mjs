@@ -2,10 +2,11 @@
 import {readFileSync, readdirSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import process from 'node:process';
+import {readTargetsConfig, resolveFields} from '../config/workshop-fields.mjs';
 
+// The consumer repo, not the kit: this file runs from inside node_modules.
 const root = process.cwd();
 const docsRoot = join(root, 'docs');
-const componentPath = join(root, 'src', 'components', 'WorkshopEnv.tsx');
 const targetsPath = join(root, 'config', 'workshop-targets.json');
 
 function collectDocs(dir) {
@@ -31,36 +32,31 @@ function formatLocation(filePath, content, index) {
   return `${relative(root, filePath)}:${lineNumberFor(content, index)}`;
 }
 
-function parseTokenMap() {
-  const content = readFileSync(componentPath, 'utf8');
-  const tokenMapMatch = content.match(/const tokenMap:[\s\S]*?=\s*{(?<body>[\s\S]*?)};/);
-  if (!tokenMapMatch?.groups?.body) {
-    throw new Error('Could not find tokenMap in src/components/WorkshopEnv.tsx.');
-  }
-
-  const tokenToField = new Map();
-  const entryPattern = /(?<token>WORKSHOP_[A-Z0-9_]+):\s*'(?<field>[a-zA-Z0-9_]+)'/g;
-  for (const match of tokenMapMatch.groups.body.matchAll(entryPattern)) {
-    tokenToField.set(match.groups.token, match.groups.field);
-  }
-
-  if (tokenToField.size === 0) {
-    throw new Error('tokenMap in src/components/WorkshopEnv.tsx does not define any workshop tokens.');
-  }
-
-  return tokenToField;
+/**
+ * The token map used to be recovered by regex-parsing src/components/WorkshopEnv.tsx.
+ * That component now lives in the kit, and the fields a repo actually has are
+ * declared in config/workshop-targets.json, so read them from there.
+ */
+function loadTokenMap() {
+  const fields = resolveFields(readTargetsConfig(root));
+  return new Map(fields.map(({field, token}) => [token, field]));
 }
 
+/**
+ * WorkshopEnv now ships from the kit, so its exported component names are known
+ * statically rather than scraped out of a file in the consumer repo.
+ */
 function parseWorkshopEnvExports() {
-  const content = readFileSync(componentPath, 'utf8');
-  return new Set(
-    [...content.matchAll(/export function (?<name>Workshop[A-Za-z0-9_]+)/g)].map(
-      (match) => match.groups.name,
-    ),
-  );
+  return new Set([
+    'WorkshopValue',
+    'WorkshopLink',
+    'WorkshopImage',
+    'WorkshopDownloadLink',
+    'WorkshopCodeBlock',
+  ]);
 }
 
-const tokenToField = parseTokenMap();
+const tokenToField = loadTokenMap();
 const validTokens = new Set(tokenToField.keys());
 const validFields = new Set(tokenToField.values());
 const exportedWorkshopComponents = parseWorkshopEnvExports();
@@ -91,8 +87,10 @@ for (const filePath of collectDocs(docsRoot)) {
     usedFields.add(field);
   }
 
+  // Accept both the kit path and the legacy @site path, so a repo mid-migration
+  // is still checked rather than silently skipped.
   const importPattern =
-    /import\s*{(?<imports>[^}]+)}\s*from\s*['"]@site\/src\/components\/WorkshopEnv['"];?/g;
+    /import\s*{(?<imports>[^}]+)}\s*from\s*['"](?:@uipath-lab-tec\/workshop-kit\/components\/WorkshopEnv|@site\/src\/components\/WorkshopEnv)['"];?/g;
   for (const match of content.matchAll(importPattern)) {
     const importedNames = match.groups.imports
       .split(',')
@@ -119,7 +117,7 @@ for (const filePath of collectDocs(docsRoot)) {
 for (const [token, field] of tokenToField.entries()) {
   if (!usedFields.has(field)) {
     errors.push(
-      `src/components/WorkshopEnv.tsx: workshop variable ${token} / ${field} is defined but not used in docs.`,
+      `config/workshop-targets.json: workshop variable ${token} / ${field} is declared but not used in docs.`,
     );
   }
 }

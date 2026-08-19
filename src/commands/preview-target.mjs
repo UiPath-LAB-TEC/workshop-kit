@@ -2,10 +2,10 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {getTarget} from './workshop-target.mjs';
+import {getTarget} from '../config/workshop-target.mjs';
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+// The consumer repo, not the kit: this file runs from inside node_modules.
+const root = process.cwd();
 const [, , targetArg, portArg = '3000'] = process.argv;
 const {targetName, target} = getTarget(targetArg);
 const port = Number(portArg);

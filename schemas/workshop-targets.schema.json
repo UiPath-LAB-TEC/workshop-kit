@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/UiPath-LAB-TEC/workshop-kit/schemas/workshop-targets.schema.json",
+  "title": "Workshop targets",
+  "type": "object",
+  "required": ["defaultTarget", "targets"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "defaultTarget": {
+      "type": "string",
+      "description": "Target used when WORKSHOP_TARGET is unset."
+    },
+    "extraFields": {
+      "type": "object",
+      "description": "Product-specific workshop fields beyond the shared four. Each entry declares its type and the {{TOKEN}} that renders it, and the kit derives the TypeScript type, the customFields.workshop payload, the token map, and the known-token list for check:workshop-vars from this one place.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "token"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {"enum": ["string"]},
+          "token": {"type": "string", "pattern": "^WORKSHOP_[A-Z0-9_]+$"}
+        }
+      },
+      "propertyNames": {"pattern": "^[a-z][a-zA-Z0-9]*$"}
+    },
+    "targets": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/definitions/target"},
+      "propertyNames": {"pattern": "^[a-z0-9][a-z0-9-]*$"}
+    }
+  },
+  "definitions": {
+    "target": {
+      "type": "object",
+      "required": ["siteUrl", "baseUrl", "workshop", "codedApp"],
+      "additionalProperties": false,
+      "properties": {
+        "siteUrl": {"type": "string", "format": "uri"},
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^/.*/$",
+          "description": "Must start and end with a slash."
+        },
+        "requiresTenantAccess": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, build:target runs the advisory tenant-access check for this target. Left false, local and offline builds never touch a live tenant."
+        },
+        "workshop": {
+          "type": "object",
+          "required": [
+            "uipathOrgName",
+            "uipathTenantName",
+            "uipathTenantUrl",
+            "orchestratorParentFolder"
+          ],
+          "properties": {
+            "uipathOrgName": {"type": "string", "minLength": 1},
+            "uipathTenantName": {"type": "string", "minLength": 1},
+            "uipathTenantUrl": {"type": "string", "format": "uri"},
+            "orchestratorParentFolder": {"type": "string", "minLength": 1}
+          },
+          "description": "The four shared fields are required in every target. Fields declared in extraFields are additionally required, enforced by check:workshop-vars rather than by this schema."
+        },
+        "codedApp": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "description": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

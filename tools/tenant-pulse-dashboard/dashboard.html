@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UiPath Tenant Pulse</title>
+  <style>
+    :root {
+      --bg: #15191c;
+      --surface: #20262a;
+      --surface-2: #2d353a;
+      --line: rgba(255,255,255,.14);
+      --text: #f7f8f9;
+      --muted: #a6b0b8;
+      --orange: #fa4616;
+      --teal: #0ba2b3;
+      --blue: #1e6482;
+      --blue-light: #5bcbde;
+      --green: #55c48f;
+      --red: #ff7058;
+      color-scheme: dark;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f6f7f8;
+      --surface: #ffffff;
+      --surface-2: #eef2f3;
+      --line: rgba(24,33,38,.14);
+      --text: #182126;
+      --muted: #5f6972;
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    a { color: inherit; }
+    button, input, select { font: inherit; }
+
+    .icon-sprite { display: none; }
+
+    .page {
+      width: min(1220px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .target {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .btn {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .btn.primary {
+      border-color: var(--orange);
+      background: var(--orange);
+      color: white;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin: 16px 0 18px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .field input,
+    .field select,
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .window-pill {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(11,162,179,.14);
+      color: var(--blue-light);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .window-pill.ended,
+    .window-pill.invalid {
+      background: rgba(255,112,88,.16);
+      color: var(--red);
+    }
+
+    .window-pill.upcoming,
+    .window-pill.unscheduled {
+      background: rgba(250,70,22,.14);
+      color: var(--orange);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 18px 0;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .status.ok .dot { background: var(--green); }
+    .status.error .dot { background: var(--red); }
+    .status.loading .dot { background: var(--orange); }
+    .status.paused .dot { background: var(--blue-light); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      min-height: 112px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .card-top,
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .resource-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: rgba(11,162,179,.15);
+      color: var(--teal);
+    }
+
+    .resource-icon.orange { background: rgba(250,70,22,.16); color: var(--orange); }
+    .resource-icon.blue { background: rgba(30,100,130,.20); color: var(--blue-light); }
+
+    .resource-icon svg {
+      width: 21px;
+      height: 21px;
+      fill: currentColor;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      margin-top: 14px;
+      font-size: clamp(36px, 3vw, 44px);
+      font-weight: 900;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+
+    .value.time-value {
+      font-size: clamp(28px, 2.5vw, 34px);
+      line-height: 1.08;
+      word-break: keep-all;
+      overflow-wrap: normal;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .panel.wide { grid-column: 1 / -1; }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .panel-head p {
+      margin: 6px 0 0;
+      font-size: 13px;
+    }
+
+    .search { width: min(270px, 100%); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th::after {
+      content: " sort";
+      margin-left: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .muted { color: var(--muted); }
+    .mono {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .evidence,
+    .chart-panel {
+      margin-top: 16px;
+    }
+
+    .chart-body {
+      padding: 14px 16px 18px;
+    }
+
+    .chart-wrap {
+      min-height: 320px;
+      overflow-x: auto;
+    }
+
+    .chart-wrap svg {
+      width: 100%;
+      min-width: 820px;
+      height: auto;
+      display: block;
+    }
+
+    .axis { stroke: var(--line); stroke-width: 1; }
+    .gridline { stroke: var(--line); stroke-width: 1; opacity: .55; }
+    .tick-label { fill: var(--muted); font-size: 11px; }
+    .series-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .series-point { stroke: var(--surface); stroke-width: 2; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 800;
+    }
+
+    .legend-swatch {
+      width: 20px;
+      height: 3px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .legend-swatch.dashed {
+      background: repeating-linear-gradient(to right, currentColor 0 8px, transparent 8px 14px);
+    }
+
+    .commands {
+      display: grid;
+      gap: 8px;
+      padding: 14px 16px 16px;
+    }
+
+    .command {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 54px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(11,162,179,.18);
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .pill.bad {
+      background: rgba(255,112,88,.18);
+      color: var(--red);
+    }
+
+    @media (max-width: 980px) {
+      .topbar, .panel-head { grid-template-columns: 1fr; flex-direction: column; align-items: stretch; }
+      .actions { justify-content: flex-start; }
+      .controls, .cards, .grid { grid-template-columns: 1fr; }
+      .panel.wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="apollo-orchestrator" viewBox="0 0 24 24">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M15.6674 12.0001C15.6674 14.0251 14.026 15.6667 12.0011 15.6667C9.97629 15.6667 8.33483 14.0251 8.33483 12.0001C8.33483 9.97503 9.97629 8.33341 12.0011 8.33341C14.026 8.33341 15.6674 9.97503 15.6674 12.0001ZM13.2232 12.0001C13.2232 12.6751 12.6761 13.2223 12.0011 13.2223C11.3262 13.2223 10.779 12.6751 10.779 12.0001C10.779 11.3251 11.3262 10.7779 12.0011 10.7779C12.6761 10.7779 13.2232 11.3251 13.2232 12.0001Z" fill="currentColor"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M4.87467 1.41679C4.74696 1.16135 4.48591 0.999996 4.20034 1C3.78398 1.00001 3.44645 1.33758 3.44645 1.75399L3.44646 11.2592C3.44646 11.3167 3.453 11.3726 3.46537 11.4263C3.45281 11.6159 3.44643 11.8073 3.44643 12.0001C3.44643 13.9643 4.1083 15.7739 5.22115 17.2181L1.4581 19.1501C1.18143 19.2608 1 19.5288 1 19.8268C1 20.2293 1.32627 20.5556 1.72876 20.5556H11.2605C11.3179 20.5556 11.3738 20.5491 11.4275 20.5367C11.6171 20.5493 11.8083 20.5556 12.0011 20.5556C13.9663 20.5556 15.7767 19.8929 17.2211 18.7788L19.1223 22.5817C19.2505 22.838 19.5125 23 19.7991 23C20.2171 23 20.5559 22.6612 20.5559 22.2432V12.7408C20.5559 12.6832 20.5493 12.6272 20.5369 12.5735C20.5494 12.384 20.5558 12.1928 20.5558 12.0001C20.5558 10.0337 19.8925 8.22217 18.7773 6.77725L22.5824 4.8754C22.8383 4.74747 23 4.48589 23 4.19975C23 3.78259 22.6619 3.44442 22.2447 3.44442H12.7419C12.6843 3.44442 12.6282 3.45099 12.5744 3.46343C12.3849 3.45089 12.1938 3.44452 12.0011 3.44452C10.0345 3.44452 8.22289 4.10819 6.77797 5.2238L4.87467 1.41679ZM12.0011 18.1112C15.3758 18.1112 18.1116 15.3752 18.1116 12.0001C18.1116 8.625 15.3758 5.88896 12.0011 5.88896C8.62638 5.88896 5.89063 8.625 5.89063 12.0001C5.89063 15.3752 8.62638 18.1112 12.0011 18.1112Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="apollo-storage-bucket" viewBox="0 0 24 24">
+      <path d="M6.54664 5.18182C6.1681 5.18182 5.846 5.31428 5.58037 5.57919C5.31455 5.8441 5.18164 6.16573 5.18164 6.5441C5.18164 6.92264 5.3141 7.24473 5.579 7.51037C5.84391 7.77619 6.16555 7.9091 6.54391 7.9091C6.92246 7.9091 7.24455 7.77664 7.51019 7.51173C7.776 7.24682 7.90891 6.9251 7.90891 6.54655C7.90891 6.16819 7.77646 5.8461 7.51155 5.58028C7.24664 5.31464 6.925 5.18182 6.54664 5.18182ZM6.54664 16.3005C6.1681 16.3005 5.846 16.433 5.58037 16.6979C5.31455 16.9628 5.18164 17.2845 5.18164 17.663C5.18164 18.0414 5.3141 18.3635 5.579 18.6293C5.84391 18.895 6.16555 19.0278 6.54391 19.0278C6.92246 19.0278 7.24455 18.8953 7.51019 18.6304C7.776 18.3655 7.90891 18.0439 7.90891 17.6655C7.90891 17.287 7.77646 16.9649 7.51155 16.6992C7.24664 16.4334 6.925 16.3005 6.54664 16.3005ZM3.14682 2.18182L20.8528 2.18182C21.1263 2.18182 21.3556 2.2741 21.5406 2.45864C21.7256 2.64301 21.818 2.87155 21.818 3.14428V9.88091C21.818 10.1762 21.7256 10.4214 21.5406 10.6165C21.3556 10.8116 21.1263 10.9091 20.8528 10.9091H3.14682C2.87337 10.9091 2.6441 10.8116 2.459 10.6165C2.2741 10.4214 2.18164 10.1762 2.18164 9.88091V3.14428C2.18164 2.87155 2.2741 2.64301 2.459 2.45864C2.6441 2.2741 2.87337 2.18182 3.14682 2.18182ZM3.818 3.81819V9.27273H20.1816V3.81819H3.818ZM3.14682 13.3005H20.8318C21.12 13.3005 21.3564 13.397 21.5409 13.5901C21.7256 13.783 21.818 14.0222 21.818 14.3077V20.7693C21.818 21.0784 21.7256 21.3305 21.5409 21.5256C21.3564 21.7206 21.12 21.8182 20.8318 21.8182H3.16782C2.87964 21.8182 2.64328 21.7206 2.45873 21.5256C2.274 21.3305 2.18164 21.0784 2.18164 20.7693V14.3077C2.18164 14.0222 2.27046 13.783 2.4481 13.5901C2.62573 13.397 2.85864 13.3005 3.14682 13.3005ZM3.818 14.9369V20.1818H20.1816V14.9369H3.818Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="apollo-studio" viewBox="0 0 24 24">
+      <path d="M17.5813 2.94018C17.5813 1.86865 16.7127 1 15.6412 1C14.5696 1 13.701 1.86865 13.701 2.94018V2.9515C13.701 4.02303 14.5696 4.89167 15.6412 4.89167C16.7127 4.89167 17.5813 4.02303 17.5813 2.9515V2.94018Z" fill="currentColor"/>
+      <path d="M8.05305 5.60639C9.0154 4.74027 10.3472 4.23363 11.7608 4.23363V1.64673C9.74396 1.64673 7.78584 2.36655 6.3225 3.68356C4.85467 5.00461 4.00011 6.82735 4.00011 8.76071C4.00011 10.6941 4.85467 12.5168 6.3225 13.8379C7.78584 15.1549 9.74396 15.8747 11.7608 15.8747V13.2878C10.3472 13.2878 9.0154 12.7812 8.05305 11.915C7.09519 11.053 6.58701 9.91476 6.58701 8.76071C6.58701 7.60667 7.09519 6.46846 8.05305 5.60639Z" fill="currentColor"/>
+      <path d="M15.4686 12.0736C14.5062 11.2075 13.1744 10.7009 11.7608 10.7009V8.11399C13.7777 8.11399 15.7358 8.83381 17.1991 10.1508C18.667 11.4719 19.5215 13.2946 19.5215 15.228C19.5215 17.1613 18.667 18.9841 17.1991 20.3051C15.7358 21.6221 13.7777 22.342 11.7608 22.342V19.7551C13.1744 19.7551 14.5062 19.2484 15.4686 18.3823C16.4264 17.5202 16.9346 16.382 16.9346 15.228C16.9346 14.0739 16.4264 12.9357 15.4686 12.0736Z" fill="currentColor"/>
+      <path d="M7.88046 19.1083C8.95199 19.1083 9.82064 19.977 9.82064 21.0485V21.0598C9.82064 22.1314 8.95199 23 7.88046 23C6.80893 23 5.94028 22.1314 5.94028 21.0598V21.0485C5.94028 19.977 6.80893 19.1083 7.88046 19.1083Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="apollo-communications-mining" viewBox="0 0 24 24">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M14.3751 18.5741C13.4392 17.5965 13.4392 16.0112 14.3751 15.0336C15.3108 14.0558 16.828 14.0558 17.7639 15.0336C18.6997 16.0112 18.6997 17.5965 17.7639 18.5741C16.828 19.5519 15.3108 19.5519 14.3751 18.5741ZM12.6806 13.2633C10.8089 15.2187 10.8089 18.389 12.6806 20.3444C14.2597 21.9943 16.6665 22.2522 18.5044 21.118L20.3056 23L22 21.2296L20.1988 19.3477C21.2842 17.4276 21.0374 14.913 19.4583 13.2633C17.5867 11.3078 14.5521 11.3078 12.6806 13.2633Z" fill="currentColor"/>
+      <path d="M18.3249 1V10.8579L16.5277 10.3884V2.87769H6.19361V9.91903H4.39638V1H18.3249Z" fill="currentColor"/>
+      <path d="M9.18899 6.78949H7.99084V9.29308H9.18899V6.78949Z" fill="currentColor"/>
+      <path d="M11.5851 8.04132H10.387V9.29311H11.5851V8.04132Z" fill="currentColor"/>
+      <path d="M10.3871 6.78949H9.18891V8.04128H10.3871V6.78949Z" fill="currentColor"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M11.5853 4.28595H7.99084V6.78954H9.18899V5.53774H10.3871V6.78954H11.5853V4.28595Z" fill="currentColor"/>
+      <path d="M13.9815 8.04132H12.7834V9.29311H13.9815V8.04132Z" fill="currentColor"/>
+      <path d="M13.9815 5.53772H12.7834V6.78951H13.9815V5.53772Z" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Local tenant pulse</p>
+        <h1>UiPath deployment counts</h1>
+        <p class="target">
+          Target:
+          <a id="targetLink" href="#" target="_blank" rel="noreferrer">Loading target...</a>
+        </p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="themeButton" type="button">Light mode</button>
+        <button class="btn primary" id="refreshButton" type="button">Refresh now</button>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Target and workshop window">
+      <div class="field">
+        <label for="targetSelect">Target</label>
+        <select id="targetSelect"></select>
+      </div>
+      <div class="field">
+        <label for="startInput">Workshop start</label>
+        <input id="startInput" type="datetime-local">
+      </div>
+      <div class="field">
+        <label for="endInput">Workshop end</label>
+        <input id="endInput" type="datetime-local">
+      </div>
+      <span class="window-pill unscheduled" id="windowState">Loading</span>
+    </section>
+
+    <div class="status loading" id="status">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="statusText">Loading configured targets...</span>
+    </div>
+
+    <section class="cards" aria-label="Summary counts">
+      <article class="card">
+        <div class="card-top">
+          <span class="resource-icon orange"><svg aria-hidden="true"><use href="#apollo-orchestrator"></use></svg></span>
+          <div class="label">Folders deployed</div>
+        </div>
+        <div class="value" id="folderCount">--</div>
+      </article>
+      <article class="card">
+        <div class="card-top">
+          <span class="resource-icon"><svg aria-hidden="true"><use href="#apollo-storage-bucket"></use></svg></span>
+          <div class="label">Buckets deployed</div>
+        </div>
+        <div class="value" id="bucketCount">--</div>
+      </article>
+      <article class="card">
+        <div class="card-top">
+          <span class="resource-icon blue"><svg aria-hidden="true"><use href="#apollo-studio"></use></svg></span>
+          <div class="label">Coded Web Apps</div>
+        </div>
+        <div class="value" id="codedAppCount">--</div>
+      </article>
+      <article class="card">
+        <div class="card-top">
+          <span class="resource-icon"><svg aria-hidden="true"><use href="#apollo-communications-mining"></use></svg></span>
+          <div class="label">IXP-Unstructured</div>
+        </div>
+        <div class="value" id="ixpProjectCount">--</div>
+      </article>
+      <article class="card">
+        <div class="label">Refresh cadence</div>
+        <div class="value">2m</div>
+      </article>
+      <article class="card">
+        <div class="label">Last checked</div>
+        <div class="value time-value" id="lastChecked">--</div>
+      </article>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <div class="section-title">
+          <span class="resource-icon blue"><svg aria-hidden="true"><use href="#apollo-studio"></use></svg></span>
+          <div>
+            <h2>Workshop deployment timeline</h2>
+            <p class="muted">Cumulative creations by half-hour tick inside the selected workshop window.</p>
+          </div>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-wrap" id="chart"></div>
+        <div class="legend" id="legend"></div>
+        <p class="muted" id="chartNote"></p>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="Resource details">
+      <article class="panel wide">
+        <div class="panel-head">
+          <div class="section-title">
+            <span class="resource-icon orange"><svg aria-hidden="true"><use href="#apollo-orchestrator"></use></svg></span>
+            <div>
+              <h2>Orchestrator folders</h2>
+              <p class="muted">Detected from <span class="mono">uip or folders list --all</span>.</p>
+            </div>
+          </div>
+          <input class="search" id="folderSearch" type="search" placeholder="Filter folders">
+        </div>
+        <div class="table-wrap">
+          <table id="foldersTable">
+            <thead>
+              <tr>
+                <th data-key="path" data-type="text">Path</th>
+                <th data-key="createdAt" data-type="date">Created</th>
+                <th data-key="type" data-type="text">Type</th>
+                <th data-key="feedType" data-type="text">Feed</th>
+                <th data-key="url" data-type="text">Link</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel wide">
+        <div class="panel-head">
+          <div class="section-title">
+            <span class="resource-icon"><svg aria-hidden="true"><use href="#apollo-storage-bucket"></use></svg></span>
+            <div>
+              <h2>Buckets</h2>
+              <p class="muted">Detected from <span class="mono">uip or buckets list --all-folders --all-fields</span>.</p>
+            </div>
+          </div>
+          <input class="search" id="bucketSearch" type="search" placeholder="Filter buckets">
+        </div>
+        <div class="table-wrap">
+          <table id="bucketsTable">
+            <thead>
+              <tr>
+                <th data-key="id" data-type="number">ID</th>
+                <th data-key="name" data-type="text">Name</th>
+                <th data-key="createdAt" data-type="date">Created</th>
+                <th data-key="foldersCount" data-type="number">Folders</th>
+                <th data-key="url" data-type="text">Link</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel wide">
+        <div class="panel-head">
+          <div class="section-title">
+            <span class="resource-icon blue"><svg aria-hidden="true"><use href="#apollo-studio"></use></svg></span>
+            <div>
+              <h2>Coded Web Apps</h2>
+              <p class="muted">Detected from Orchestrator packages where <span class="mono">PackageType</span> is <span class="mono">WebApp</span>.</p>
+            </div>
+          </div>
+          <input class="search" id="codedAppSearch" type="search" placeholder="Filter coded apps">
+        </div>
+        <div class="table-wrap">
+          <table id="codedAppsTable">
+            <thead>
+              <tr>
+                <th data-key="title" data-type="text">App</th>
+                <th data-key="version" data-type="text">Version</th>
+                <th data-key="published" data-type="date">Published</th>
+                <th data-key="authors" data-type="text">Author</th>
+                <th data-key="url" data-type="text">Link</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel wide">
+        <div class="panel-head">
+          <div class="section-title">
+            <span class="resource-icon"><svg aria-hidden="true"><use href="#apollo-communications-mining"></use></svg></span>
+            <div>
+              <h2>IXP-Unstructured Projects</h2>
+              <p class="muted" id="ixpEvidence">Detected from the configured Re:infer context and filtered to names ending <span class="mono">-ixp</span>.</p>
+            </div>
+          </div>
+          <input class="search" id="ixpProjectSearch" type="search" placeholder="Filter IXP-Unstructured projects">
+        </div>
+        <div class="table-wrap">
+          <table id="ixpProjectsTable">
+            <thead>
+              <tr>
+                <th data-key="title" data-type="text">Project</th>
+                <th data-key="name" data-type="text">Name</th>
+                <th data-key="createdAt" data-type="date">Created</th>
+                <th data-key="url" data-type="text">Link</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel evidence">
+      <div class="panel-head">
+        <div>
+          <h2>Command evidence</h2>
+          <p class="muted">Counts are produced locally by the <span class="mono">uip</span> and <span class="mono">re</span> CLIs; this page renders normalized results from the local server.</p>
+        </div>
+      </div>
+      <div class="commands" id="commands"></div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      targets: [],
+      pulse: null,
+      sort: {
+        foldersTable: { key: "path", direction: "asc", type: "text" },
+        bucketsTable: { key: "id", direction: "desc", type: "number" },
+        codedAppsTable: { key: "published", direction: "desc", type: "date" },
+        ixpProjectsTable: { key: "createdAt", direction: "desc", type: "date" },
+      },
+      nextRefreshAt: null,
+    };
+
+    const targetSelect = document.querySelector("#targetSelect");
+    const startInput = document.querySelector("#startInput");
+    const endInput = document.querySelector("#endInput");
+    const windowState = document.querySelector("#windowState");
+    const refreshButton = document.querySelector("#refreshButton");
+    const themeButton = document.querySelector("#themeButton");
+    const folderSearch = document.querySelector("#folderSearch");
+    const bucketSearch = document.querySelector("#bucketSearch");
+    const codedAppSearch = document.querySelector("#codedAppSearch");
+    const ixpProjectSearch = document.querySelector("#ixpProjectSearch");
+
+    function formatNumber(value) {
+      return Number(value || 0).toLocaleString();
+    }
+
+    function formatTime(iso) {
+      if (!iso) return "--";
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(iso));
+    }
+
+    function setText(selector, value) {
+      const element = document.querySelector(selector);
+      if (element) element.textContent = value;
+    }
+
+    function formatFullDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(date);
+    }
+
+    function formatTick(value) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(value));
+    }
+
+    function setStatus(kind, text) {
+      const status = document.querySelector("#status");
+      status.className = `status ${kind}`;
+      document.querySelector("#statusText").textContent = text;
+    }
+
+    function setWindowState(window) {
+      const stateName = window?.state || "unscheduled";
+      windowState.className = `window-pill ${stateName}`;
+      windowState.textContent = stateName.charAt(0).toUpperCase() + stateName.slice(1);
+    }
+
+    function compareRows(a, b, key, type, direction) {
+      const multiplier = direction === "asc" ? 1 : -1;
+      if (type === "number") {
+        return ((Number(a[key]) || 0) - (Number(b[key]) || 0)) * multiplier;
+      }
+      if (type === "date") {
+        return ((Date.parse(a[key]) || 0) - (Date.parse(b[key]) || 0)) * multiplier;
+      }
+      return String(a[key] || "").localeCompare(String(b[key] || ""), undefined, { numeric: true }) * multiplier;
+    }
+
+    function rowMatches(row, filter) {
+      if (!filter) return true;
+      return Object.values(row).join(" ").toLowerCase().includes(filter.toLowerCase());
+    }
+
+    function openLink(url, label = "Open") {
+      return url ? `<a href="${escapeAttribute(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` : "";
+    }
+
+    function renderTable(tableId, rows, filter) {
+      const table = document.querySelector(`#${tableId}`);
+      const tbody = table.querySelector("tbody");
+      const sort = state.sort[tableId];
+      const filteredRows = rows.filter((row) => rowMatches(row, filter)).sort((a, b) => compareRows(a, b, sort.key, sort.type, sort.direction));
+
+      tbody.innerHTML = "";
+      for (const row of filteredRows) {
+        const tr = document.createElement("tr");
+        if (tableId === "foldersTable") {
+          const title = row.url ? `<a href="${escapeAttribute(row.url)}" target="_blank" rel="noreferrer"><strong>${escapeHtml(row.path || row.name)}</strong></a>` : `<strong>${escapeHtml(row.path || row.name)}</strong>`;
+          tr.innerHTML = `<td>${title}<div class="muted mono">${escapeHtml(row.key || "")}</div></td><td>${escapeHtml(formatFullDate(row.createdAt))}</td><td>${escapeHtml(row.type)}</td><td>${escapeHtml(row.feedType)}</td><td>${openLink(row.url)}</td>`;
+        } else if (tableId === "bucketsTable") {
+          const title = row.url ? `<a href="${escapeAttribute(row.url)}" target="_blank" rel="noreferrer"><strong>${escapeHtml(row.name)}</strong></a>` : `<strong>${escapeHtml(row.name)}</strong>`;
+          tr.innerHTML = `<td class="mono">${escapeHtml(String(row.id))}</td><td>${title}<div class="muted mono">${escapeHtml(row.key || row.description || "")}</div></td><td>${escapeHtml(formatFullDate(row.createdAt))}</td><td>${escapeHtml(String(row.foldersCount))}</td><td>${openLink(row.url)}</td>`;
+        } else if (tableId === "codedAppsTable") {
+          const title = row.url ? `<a href="${escapeAttribute(row.url)}" target="_blank" rel="noreferrer"><strong>${escapeHtml(row.title)}</strong></a>` : `<strong>${escapeHtml(row.title)}</strong>`;
+          tr.innerHTML = `<td>${title}<div class="muted">${escapeHtml(row.description || row.id)}</div></td><td class="mono">${escapeHtml(row.version)}</td><td>${escapeHtml(formatFullDate(row.published))}</td><td>${escapeHtml(row.authors)}</td><td>${openLink(row.url)}</td>`;
+        } else {
+          const title = row.url ? `<a href="${escapeAttribute(row.url)}" target="_blank" rel="noreferrer"><strong>${escapeHtml(row.title)}</strong></a>` : `<strong>${escapeHtml(row.title)}</strong>`;
+          tr.innerHTML = `<td>${title}<div class="muted mono">${escapeHtml(row.id)}</div></td><td class="mono">${escapeHtml(row.name)}</td><td>${escapeHtml(formatFullDate(row.createdAt))}</td><td>${openLink(row.url)}</td>`;
+        }
+        tbody.appendChild(tr);
+      }
+    }
+
+    function escapeAttribute(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[char]);
+    }
+
+    function renderCommands(commands) {
+      const container = document.querySelector("#commands");
+      container.innerHTML = "";
+      for (const command of commands || []) {
+        const row = document.createElement("div");
+        row.className = "command";
+        row.innerHTML = `
+          <span class="mono">${escapeHtml(command.command)}</span>
+          <span class="muted">${formatNumber(command.durationMs)} ms</span>
+          <span class="pill ${command.ok ? "" : "bad"}">${command.ok ? "OK" : "Failed"}</span>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function renderChart(timeline) {
+      const chart = document.querySelector("#chart");
+      const legend = document.querySelector("#legend");
+      const note = document.querySelector("#chartNote");
+      if (!timeline?.ticks?.length || !timeline?.series?.length) {
+        chart.innerHTML = '<p class="muted">Set a valid workshop window to render the timeline.</p>';
+        legend.innerHTML = "";
+        note.textContent = "";
+        return;
+      }
+
+      const width = 980;
+      const height = 300;
+      const left = 56;
+      const right = 940;
+      const top = 24;
+      const bottom = 238;
+      const maxValue = Math.max(1, ...timeline.series.flatMap((series) => series.points.map((point) => point.value)));
+      const xStep = timeline.ticks.length > 1 ? (right - left) / (timeline.ticks.length - 1) : 0;
+      const yFor = (value) => bottom - (value / maxValue) * (bottom - top);
+      const xFor = (index) => left + index * xStep;
+      const yTicks = Array.from({ length: maxValue + 1 }, (_, index) => index).filter((value) => value === 0 || value === maxValue || value % Math.max(1, Math.ceil(maxValue / 5)) === 0);
+
+      const grid = yTicks.map((value) => {
+        const y = yFor(value);
+        return `<line class="gridline" x1="${left}" y1="${y}" x2="${right}" y2="${y}"></line><text class="tick-label" x="18" y="${y + 4}">${value}</text>`;
+      }).join("");
+
+      const tickLabels = timeline.ticks.map((tick, index) => {
+        const x = xFor(index);
+        return `<line class="axis" x1="${x}" y1="${bottom}" x2="${x}" y2="${bottom + 5}"></line><text class="tick-label" x="${x}" y="${bottom + 22}" text-anchor="middle">${escapeHtml(formatTick(tick))}</text>`;
+      }).join("");
+
+      const lines = timeline.series.map((series) => {
+        const isBucketSeries = series.id === "buckets";
+        const path = series.points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.value)}`).join(" ");
+        const points = series.points.map((point, index) => `<circle class="series-point" cx="${xFor(index)}" cy="${yFor(point.value)}" r="4" fill="${escapeAttribute(series.color)}"><title>${escapeHtml(series.label)} ${formatTick(point.tick)}: ${point.value}</title></circle>`).join("");
+        const dashArray = isBucketSeries ? ' stroke-dasharray="8 6"' : "";
+        return `<path class="series-line" d="${path}" stroke="${escapeAttribute(series.color)}"${dashArray}></path>${points}`;
+      }).join("");
+
+      chart.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Workshop deployment timeline">
+          ${grid}
+          <line class="axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
+          <line class="axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}"></line>
+          ${tickLabels}
+          ${lines}
+        </svg>
+      `;
+      legend.innerHTML = timeline.series.map((series) => `
+        <span class="legend-item" style="color:${escapeAttribute(series.color)}"><span class="legend-swatch${series.id === "buckets" ? " dashed" : ""}"></span>${escapeHtml(series.label)}</span>
+      `).join("");
+      const unplotted = timeline.unplotted || {};
+      const unplottedText = Object.entries(unplotted).filter((entry) => Number(entry[1]) > 0).map(([key, value]) => `${value} ${key}`).join(", ");
+      note.textContent = unplottedText ? `Some current rows had no creation event in the selected window and are not plotted: ${unplottedText}.` : "All plotted resources have a creation timestamp inside the selected window.";
+    }
+
+    function renderPulse(pulse) {
+      state.pulse = pulse;
+      const target = pulse.target || {};
+      document.querySelector("#targetLink").href = target.tenantUrl || "#";
+      document.querySelector("#targetLink").textContent = target.tenantUrl || "No target";
+      document.querySelector("#ixpEvidence").innerHTML = `Detected from <span class="mono">${escapeHtml(target.reContext || "no Re:infer context")}</span>, filtered to names ending <span class="mono">-ixp</span>.`;
+      setWindowState(pulse.window);
+
+      document.querySelector("#folderCount").textContent = formatNumber(pulse.counts?.folders);
+      document.querySelector("#bucketCount").textContent = formatNumber(pulse.counts?.buckets);
+      document.querySelector("#codedAppCount").textContent = formatNumber(pulse.counts?.codedWebApps);
+      document.querySelector("#ixpProjectCount").textContent = formatNumber(pulse.counts?.ixpProjects);
+      setText("#lastChecked", formatTime(pulse.updatedAt));
+
+      renderChart(pulse.timeline);
+      renderTable("foldersTable", pulse.folders || [], folderSearch.value);
+      renderTable("bucketsTable", pulse.buckets || [], bucketSearch.value);
+      renderTable("codedAppsTable", pulse.codedWebApps || [], codedAppSearch.value);
+      renderTable("ixpProjectsTable", pulse.ixpProjects || [], ixpProjectSearch.value);
+      renderCommands(pulse.commands || []);
+
+      if (pulse.paused) {
+        setStatus("paused", pulse.message || "Automatic refresh is paused outside the selected workshop window.");
+      } else if (pulse.ok) {
+        setStatus("ok", `Showing ${formatNumber(pulse.counts.folders)} folders, ${formatNumber(pulse.counts.buckets)} buckets, ${formatNumber(pulse.counts.codedWebApps)} coded web apps, and ${formatNumber(pulse.counts.ixpProjects)} IXP-Unstructured projects from ${target.organization} / ${target.tenant}.`);
+      } else if (pulse.stale && pulse.folders?.length) {
+        setStatus("error", `Showing last good data. Latest refresh failed: ${pulse.error || "unknown error"}`);
+      } else {
+        setStatus("error", pulse.error || "Refresh failed.");
+      }
+    }
+
+    function selectedTarget() {
+      return state.targets.find((target) => target.id === targetSelect.value) || state.targets[0];
+    }
+
+    function toLocalInputValue(iso) {
+      if (!iso) return "";
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return "";
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function queryParams(force, mode) {
+      const params = new URLSearchParams();
+      params.set("target", targetSelect.value);
+      params.set("mode", mode);
+      if (force) params.set("force", "1");
+      if (startInput.value) params.set("start", new Date(startInput.value).toISOString());
+      if (endInput.value) params.set("end", new Date(endInput.value).toISOString());
+      return params;
+    }
+
+    function persistWindow() {
+      try {
+        localStorage.setItem(`tenantPulseWindow:${targetSelect.value}`, JSON.stringify({
+          start: startInput.value,
+          end: endInput.value,
+        }));
+      } catch {}
+    }
+
+    function applyTargetDefaults(target) {
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(`tenantPulseWindow:${target.id}`) || "null");
+      } catch {}
+      startInput.value = saved?.start || toLocalInputValue(target.workshopStart);
+      endInput.value = saved?.end || toLocalInputValue(target.workshopEnd);
+      document.querySelector("#targetLink").href = target.tenantUrl;
+      document.querySelector("#targetLink").textContent = target.tenantUrl;
+    }
+
+    async function loadPulse(force = false, mode = "auto") {
+      refreshButton.disabled = true;
+      setStatus("loading", force ? "Refreshing counts from UiPath CLI..." : "Loading dashboard data...");
+      try {
+        const response = await fetch(`/api/pulse?${queryParams(force, mode)}`, { cache: "no-store" });
+        const pulse = await response.json();
+        renderPulse(pulse);
+        state.nextRefreshAt = pulse.paused ? null : Date.now() + Number(pulse.refreshIntervalMs || 120000);
+      } catch (error) {
+        setStatus("error", `Unable to load dashboard data: ${error.message || error}`);
+      } finally {
+        refreshButton.disabled = false;
+      }
+    }
+
+    async function loadTargets() {
+      const response = await fetch("/api/targets", { cache: "no-store" });
+      const payload = await response.json();
+      state.targets = payload.targets || [];
+      targetSelect.innerHTML = state.targets.map((target) => `<option value="${escapeAttribute(target.id)}">${escapeHtml(target.label)} (${escapeHtml(target.environment)})</option>`).join("");
+      if (state.targets.length > 0) {
+        applyTargetDefaults(state.targets[0]);
+      }
+    }
+
+    function updateCountdown() {
+      if (!state.nextRefreshAt) {
+        return;
+      }
+      const remainingSeconds = Math.max(0, Math.ceil((state.nextRefreshAt - Date.now()) / 1000));
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = String(remainingSeconds % 60).padStart(2, "0");
+      setText("#countdown", `Next refresh in ${minutes}:${seconds}`);
+    }
+
+    document.querySelectorAll("th").forEach((header) => {
+      header.addEventListener("click", () => {
+        if (!state.pulse) return;
+        const tableId = header.closest("table").id;
+        const current = state.sort[tableId];
+        const key = header.dataset.key;
+        state.sort[tableId] = {
+          key,
+          type: header.dataset.type || "text",
+          direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+        };
+        renderPulse(state.pulse);
+      });
+    });
+
+    folderSearch.addEventListener("input", () => {
+      if (state.pulse) renderTable("foldersTable", state.pulse.folders || [], folderSearch.value);
+    });
+    bucketSearch.addEventListener("input", () => {
+      if (state.pulse) renderTable("bucketsTable", state.pulse.buckets || [], bucketSearch.value);
+    });
+    codedAppSearch.addEventListener("input", () => {
+      if (state.pulse) renderTable("codedAppsTable", state.pulse.codedWebApps || [], codedAppSearch.value);
+    });
+    ixpProjectSearch.addEventListener("input", () => {
+      if (state.pulse) renderTable("ixpProjectsTable", state.pulse.ixpProjects || [], ixpProjectSearch.value);
+    });
+
+    targetSelect.addEventListener("change", () => {
+      const target = selectedTarget();
+      applyTargetDefaults(target);
+      void loadPulse(false, "auto");
+    });
+    startInput.addEventListener("change", () => {
+      persistWindow();
+      void loadPulse(false, "auto");
+    });
+    endInput.addEventListener("change", () => {
+      persistWindow();
+      void loadPulse(false, "auto");
+    });
+
+    refreshButton.addEventListener("click", () => loadPulse(true, "manual"));
+    themeButton.addEventListener("click", () => {
+      const root = document.documentElement;
+      const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = nextTheme;
+      try {
+        localStorage.setItem("tenantPulseTheme", nextTheme);
+      } catch {}
+      themeButton.textContent = nextTheme === "dark" ? "Light mode" : "Dark mode";
+    });
+
+    let savedTheme = null;
+    try {
+      savedTheme = localStorage.getItem("tenantPulseTheme");
+    } catch {}
+    if (savedTheme) {
+      document.documentElement.dataset.theme = savedTheme;
+      themeButton.textContent = savedTheme === "dark" ? "Light mode" : "Dark mode";
+    }
+
+    setInterval(updateCountdown, 1000);
+    setInterval(() => loadPulse(false, "auto"), 120000);
+
+    void (async () => {
+      try {
+        await loadTargets();
+        await loadPulse(false, "auto");
+      } catch (error) {
+        setStatus("error", `Unable to initialize dashboard: ${error.message || error}`);
+      }
+    })();
+  </script>
+</body>
+</html>

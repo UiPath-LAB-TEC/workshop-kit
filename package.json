@@ -13,11 +13,15 @@
   },
   "exports": {
     ".": "./src/index.mjs",
-    "./config": "./src/config/createWorkshopConfig.ts",
+    "./config": {
+      "types": "./src/config/createWorkshopConfig.d.ts",
+      "default": "./src/config/createWorkshopConfig.mjs"
+    },
     "./components/WorkshopEnv": "./src/components/WorkshopEnv.tsx",
     "./css/workshop.css": "./src/css/workshop.css",
     "./schemas/workshop-targets.schema.json": "./schemas/workshop-targets.schema.json",
-    "./agents/base.md": "./agents/base.md"
+    "./agents/base.md": "./agents/base.md",
+    "./components/WorkshopHome": "./src/components/WorkshopHome.tsx"
   },
   "files": [
     "bin",
