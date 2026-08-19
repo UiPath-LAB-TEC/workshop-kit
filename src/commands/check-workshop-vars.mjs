@@ -1,0 +1,146 @@
+#!/usr/bin/env node
+import {readFileSync, readdirSync} from 'node:fs';
+import {join, relative} from 'node:path';
+import process from 'node:process';
+
+const root = process.cwd();
+const docsRoot = join(root, 'docs');
+const componentPath = join(root, 'src', 'components', 'WorkshopEnv.tsx');
+const targetsPath = join(root, 'config', 'workshop-targets.json');
+
+function collectDocs(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir, {withFileTypes: true})) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectDocs(fullPath));
+      continue;
+    }
+    if (/\.(md|mdx)$/.test(entry.name)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function lineNumberFor(content, index) {
+  return content.slice(0, index).split('\n').length;
+}
+
+function formatLocation(filePath, content, index) {
+  return `${relative(root, filePath)}:${lineNumberFor(content, index)}`;
+}
+
+function parseTokenMap() {
+  const content = readFileSync(componentPath, 'utf8');
+  const tokenMapMatch = content.match(/const tokenMap:[\s\S]*?=\s*{(?<body>[\s\S]*?)};/);
+  if (!tokenMapMatch?.groups?.body) {
+    throw new Error('Could not find tokenMap in src/components/WorkshopEnv.tsx.');
+  }
+
+  const tokenToField = new Map();
+  const entryPattern = /(?<token>WORKSHOP_[A-Z0-9_]+):\s*'(?<field>[a-zA-Z0-9_]+)'/g;
+  for (const match of tokenMapMatch.groups.body.matchAll(entryPattern)) {
+    tokenToField.set(match.groups.token, match.groups.field);
+  }
+
+  if (tokenToField.size === 0) {
+    throw new Error('tokenMap in src/components/WorkshopEnv.tsx does not define any workshop tokens.');
+  }
+
+  return tokenToField;
+}
+
+function parseWorkshopEnvExports() {
+  const content = readFileSync(componentPath, 'utf8');
+  return new Set(
+    [...content.matchAll(/export function (?<name>Workshop[A-Za-z0-9_]+)/g)].map(
+      (match) => match.groups.name,
+    ),
+  );
+}
+
+const tokenToField = parseTokenMap();
+const validTokens = new Set(tokenToField.keys());
+const validFields = new Set(tokenToField.values());
+const exportedWorkshopComponents = parseWorkshopEnvExports();
+const usedTokens = new Set();
+const usedFields = new Set();
+const usedComponents = new Set();
+const errors = [];
+
+for (const filePath of collectDocs(docsRoot)) {
+  const content = readFileSync(filePath, 'utf8');
+
+  for (const match of content.matchAll(/\{\{(?<token>WORKSHOP_[A-Z0-9_]+)\}\}/g)) {
+    const token = match.groups.token;
+    if (!validTokens.has(token)) {
+      errors.push(`${formatLocation(filePath, content, match.index)}: unknown workshop token {{${token}}}.`);
+      continue;
+    }
+    usedTokens.add(token);
+    usedFields.add(tokenToField.get(token));
+  }
+
+  for (const match of content.matchAll(/<Workshop(?:Value|Link)\b[^>]*\bfield=["'](?<field>[a-zA-Z0-9_]+)["']/g)) {
+    const field = match.groups.field;
+    if (!validFields.has(field)) {
+      errors.push(`${formatLocation(filePath, content, match.index)}: unknown workshop field "${field}".`);
+      continue;
+    }
+    usedFields.add(field);
+  }
+
+  const importPattern =
+    /import\s*{(?<imports>[^}]+)}\s*from\s*['"]@site\/src\/components\/WorkshopEnv['"];?/g;
+  for (const match of content.matchAll(importPattern)) {
+    const importedNames = match.groups.imports
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean);
+    const contentAfterImport = content.slice(match.index + match[0].length);
+
+    for (const importedName of importedNames) {
+      const localName = importedName.split(/\s+as\s+/).pop().trim();
+      const componentUsagePattern = new RegExp(`<${localName}\\b`);
+      if (!componentUsagePattern.test(contentAfterImport)) {
+        errors.push(
+          `${formatLocation(filePath, content, match.index)}: ${localName} is imported from WorkshopEnv but not used.`,
+        );
+        continue;
+      }
+      if (exportedWorkshopComponents.has(localName)) {
+        usedComponents.add(localName);
+      }
+    }
+  }
+}
+
+for (const [token, field] of tokenToField.entries()) {
+  if (!usedFields.has(field)) {
+    errors.push(
+      `src/components/WorkshopEnv.tsx: workshop variable ${token} / ${field} is defined but not used in docs.`,
+    );
+  }
+}
+
+const targetsConfig = JSON.parse(readFileSync(targetsPath, 'utf8'));
+for (const [targetName, target] of Object.entries(targetsConfig.targets || {})) {
+  for (const field of validFields) {
+    if (!target.workshop || !target.workshop[field]) {
+      errors.push(`config/workshop-targets.json: target "${targetName}" is missing workshop.${field}.`);
+    }
+  }
+}
+
+if (errors.length > 0) {
+  console.error(`Workshop variable check failed with ${errors.length} issue(s):`);
+  for (const error of errors) {
+    console.error(`- ${error}`);
+  }
+  process.exit(1);
+}
+
+console.log(
+  `Workshop variable check passed (${usedTokens.size} token reference(s), ${usedFields.size} field(s), ${usedComponents.size} WorkshopEnv component(s) checked).`,
+);
