@@ -19,9 +19,9 @@ const USAGE = `workshop-kit <command>
   check:doc-assets             verify every asset referenced by docs exists
   check:workshop-vars          verify workshop tokens, fields and components line up
   check:tenant-access          advisory tenant permission report (never fails a build)
-  build [--target <name>]      docusaurus build with WORKSHOP_TARGET pinned
-  start [--target <name>]      docusaurus start with WORKSHOP_TARGET pinned
-  preview [--target <name>]    serve build/ at the target's baseUrl
+  build [<target>]             docusaurus build with WORKSHOP_TARGET pinned
+  start [<target>]             docusaurus start with WORKSHOP_TARGET pinned
+  preview [<target>] [<port>]  serve build/ at the target's baseUrl
   codedapp <check|pack|publish|deploy|all>
   pulse                        tenant pulse dashboard
   doctor                       report kit version, resolved target and drift
@@ -46,6 +46,18 @@ function takeFlag(args, name) {
   const value = args[index + 1];
   args.splice(index, 2);
   return value;
+}
+
+/**
+ * Target from either `--target <name>` or a bare leading positional, because the
+ * repos' existing scripts are invoked as `npm run build:target -- local`.
+ * Docusaurus flags always start with `-`, so a leading bare word is the target.
+ */
+function takeTarget(args) {
+  const flag = takeFlag(args, '--target');
+  if (flag) return flag;
+  if (args.length > 0 && !args[0].startsWith('-')) return args.shift();
+  return undefined;
 }
 
 async function main() {
@@ -122,15 +134,18 @@ async function main() {
 
     case 'build':
     case 'start': {
-      const target = takeFlag(argv, '--target');
+      const target = takeTarget(argv);
       const {docusaurusTarget} = await import(join(commandsDir, 'docusaurus-target.mjs'));
       docusaurusTarget({command, targetArg: target, docusaurusArgs: argv});
       return 0;
     }
 
     case 'preview': {
-      const target = takeFlag(argv, '--target');
-      return runScript('src/commands/preview-target.mjs', [target ?? '', ...argv].filter(Boolean));
+      const target = takeTarget(argv);
+      return runScript(
+        'src/commands/preview-target.mjs',
+        target ? [target, ...argv] : argv,
+      );
     }
 
     case 'codedapp': {

@@ -21,7 +21,8 @@
     "./css/workshop.css": "./src/css/workshop.css",
     "./schemas/workshop-targets.schema.json": "./schemas/workshop-targets.schema.json",
     "./agents/base.md": "./agents/base.md",
-    "./components/WorkshopHome": "./src/components/WorkshopHome.tsx"
+    "./components/WorkshopHome": "./src/components/WorkshopHome.tsx",
+    "./package.json": "./package.json"
   },
   "files": [
     "bin",

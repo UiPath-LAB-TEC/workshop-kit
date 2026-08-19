@@ -17,9 +17,34 @@
  * transpiled. Types live in createWorkshopConfig.d.ts.
  */
 import {createRequire} from 'node:module';
-import {themes as prismThemes} from 'prism-react-renderer';
+import {join} from 'node:path';
 
 const require = createRequire(import.meta.url);
+
+/**
+ * Resolve from the CONSUMER, not the kit. Under a `file:` dependency the kit is a
+ * symlink, so Node resolves the kit's imports against the kit's real path and
+ * never sees the consumer's node_modules. Every workshop already depends on
+ * prism-react-renderer and Docusaurus directly, so ask them; fall back to the
+ * kit's own resolution for a normal hoisted install.
+ */
+function fromConsumer(specifier) {
+  try {
+    return createRequire(join(process.cwd(), 'package.json'))(specifier);
+  } catch {
+    return require(specifier);
+  }
+}
+
+function resolveFromConsumer(specifier) {
+  try {
+    return createRequire(join(process.cwd(), 'package.json')).resolve(specifier);
+  } catch {
+    return require.resolve(specifier);
+  }
+}
+
+const {themes: prismThemes} = fromConsumer('prism-react-renderer');
 import {getTarget} from './workshop-target.mjs';
 import {readTargetsConfig, resolveFields, tokenToFieldMap, workshopPayload} from './workshop-fields.mjs';
 
@@ -88,7 +113,7 @@ export function createWorkshopConfig(overrides = {}) {
           blog: false,
           theme: {
             customCss: overrides.customCss ?? [
-              require.resolve('@uipath-lab-tec/workshop-kit/css/workshop.css'),
+              resolveFromConsumer('@uipath-lab-tec/workshop-kit/css/workshop.css'),
             ],
           },
         },
