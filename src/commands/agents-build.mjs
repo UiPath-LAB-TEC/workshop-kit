@@ -19,6 +19,7 @@
  * whose contents are about to be overwritten.
  */
 import {readFileSync, writeFileSync, existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import process from 'node:process';
@@ -28,16 +29,25 @@ const kitRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BEGIN = '<!-- BEGIN workshop-kit base';
 const END = '<!-- END workshop-kit base -->';
 
-function kitVersion() {
-  return JSON.parse(readFileSync(join(kitRoot, 'package.json'), 'utf8')).version;
-}
-
 function baseText() {
   return readFileSync(join(kitRoot, 'agents', 'base.md'), 'utf8').trimEnd();
 }
 
+/**
+ * The marker stamps a hash of base.md's CONTENT, not the kit version.
+ *
+ * With the version in the marker, every kit release — including a patch that
+ * never touched base.md — marked every repo's AGENTS.md stale, so CI failed on
+ * each dependency bump until a regeneration commit landed. Hashing the content
+ * means the marker moves only when the shared standard actually moves. Use
+ * `workshop-kit doctor` to see which kit version is installed.
+ */
+function baseDigest() {
+  return createHash('sha256').update(baseText()).digest('hex').slice(0, 8);
+}
+
 function fencedBlock() {
-  const begin = `${BEGIN} @${kitVersion()} — DO NOT EDIT. Run \`npm run prepare:docs\`. -->`;
+  const begin = `${BEGIN} @sha-${baseDigest()} — DO NOT EDIT. Run \`npm run prepare:docs\`. -->`;
   return `${begin}\n${baseText()}\n${END}`;
 }
 
