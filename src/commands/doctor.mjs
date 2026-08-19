@@ -63,11 +63,33 @@ export function doctor({root = process.cwd()} = {}) {
     'scripts/check-doc-assets.mjs',
     'scripts/check-workshop-vars.mjs',
     'scripts/workshop-target.mjs',
-    'src/components/WorkshopEnv.tsx',
+    'scripts/preview-target.mjs',
+    'scripts/docusaurus-target.mjs',
+    'scripts/uipath-codedapp-deploy.mjs',
+    'scripts/check-tenant-access.mjs',
+    'src/css/custom.css',
+    'src/pages/index.module.css',
     'AGENTS.product.md',
   ]) {
     if (existsSync(join(root, stale))) {
       notes.push(`${stale} still exists; the kit now provides it.`);
+    }
+  }
+
+  // These two legitimately remain, as one-line re-exports: docs import
+  // '@site/src/components/WorkshopEnv', and Docusaurus needs a real
+  // src/pages/index.tsx. Only a forked copy is a problem.
+  for (const [file, expected] of [
+    ['src/components/WorkshopEnv.tsx', 'components/WorkshopEnv'],
+    ['src/pages/index.tsx', 'components/WorkshopHome'],
+  ]) {
+    const path = join(root, file);
+    if (!existsSync(path)) continue;
+    const content = readFileSync(path, 'utf8');
+    if (!content.includes(`@uipath-lab-tec/workshop-kit/${expected}`)) {
+      notes.push(
+        `${file} does not re-export from the kit, so it is a forked copy that will drift.`,
+      );
     }
   }
 
