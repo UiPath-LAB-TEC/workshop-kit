@@ -29,6 +29,8 @@ export type WorkshopTargetsConfig = {
   tagline: string;
   /** `<org>/<repo>`, e.g. `UiPath-LAB-TEC/maestro-workshop`. */
   repo: string;
+  /** Footer "Docs" link label. Defaults to "Workshop Docs". */
+  docsLabel?: string;
   defaultTarget: string;
   extraFields?: Record<string, ExtraFieldDeclaration>;
   targets: Record<string, WorkshopTarget>;
@@ -38,6 +40,7 @@ export type CreateWorkshopConfigOverrides = {
   title?: string;
   tagline?: string;
   repo?: string;
+  docsLabel?: string;
   /** Replaces the kit stylesheet. Add a product stylesheet alongside it, don't drop it. */
   customCss?: string[];
   /** Last-resort escape hatch for a workshop that needs to alter the generated config. */

@@ -57,6 +57,10 @@ export function createWorkshopConfig(overrides = {}) {
   const title = overrides.title ?? config.title;
   const tagline = overrides.tagline ?? config.tagline;
   const repo = overrides.repo ?? config.repo;
+  // Each repo worded this differently ("Workshop Docs", "IXP Workshop Docs",
+  // "Maestro Workshop Docs"). User-visible, so it stays per-repo rather than
+  // being flattened to whichever repo the factory was written against.
+  const docsLabel = overrides.docsLabel ?? config.docsLabel ?? 'Workshop Docs';
 
   for (const [name, value] of Object.entries({title, tagline, repo})) {
     if (!value) {
@@ -151,7 +155,7 @@ export function createWorkshopConfig(overrides = {}) {
         links: [
           {
             title: 'Docs',
-            items: [{label: 'Workshop Docs', to: '/docs/overview'}],
+            items: [{label: docsLabel, to: '/docs/overview'}],
           },
           {
             title: 'More',
