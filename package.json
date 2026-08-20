@@ -1,6 +1,6 @@
 {
   "name": "@uipath-lab-tec/workshop-kit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared Docusaurus infrastructure for UiPath LAB TEC workshop repos.",
   "license": "UNLICENSED",
   "type": "module",
@@ -17,14 +17,21 @@
       "types": "./src/config/createWorkshopConfig.d.ts",
       "default": "./src/config/createWorkshopConfig.mjs"
     },
-    "./components/WorkshopEnv": "./src/components/WorkshopEnv.tsx",
+    "./components/WorkshopEnv": {
+      "types": "./dist/components/WorkshopEnv.d.ts",
+      "default": "./dist/components/WorkshopEnv.js"
+    },
     "./css/workshop.css": "./src/css/workshop.css",
     "./schemas/workshop-targets.schema.json": "./schemas/workshop-targets.schema.json",
     "./agents/base.md": "./agents/base.md",
-    "./components/WorkshopHome": "./src/components/WorkshopHome.tsx",
+    "./components/WorkshopHome": {
+      "types": "./dist/components/WorkshopHome.d.ts",
+      "default": "./dist/components/WorkshopHome.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
+    "dist",
     "bin",
     "src",
     "agents",
@@ -55,7 +62,9 @@
     "@docusaurus/theme-classic": "3.10.1"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "prepare": "npm run build",
     "typecheck": "tsc",
-    "validate": "node bin/workshop-kit.mjs --version && npm run typecheck"
+    "validate": "npm run typecheck && npm run build"
   }
 }

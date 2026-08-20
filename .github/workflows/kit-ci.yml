@@ -23,6 +23,34 @@ jobs:
       - name: Typecheck the shared components
         run: npm run typecheck
 
+      # Consumers must resolve compiled JS, never raw .tsx. Shipping source only
+      # appeared to work because a `file:` dependency is a symlink whose real path
+      # sits outside node_modules and therefore does get transpiled; a genuine
+      # install is a real directory, which webpack excludes.
+      - name: Components are compiled for consumers
+        run: |
+          set -e
+          npm run build
+          for f in dist/components/WorkshopEnv.js dist/components/WorkshopHome.js \
+                   dist/components/WorkshopEnv.d.ts dist/components/WorkshopHome.d.ts \
+                   dist/components/WorkshopHome.module.css; do
+            [ -f "$f" ] || { echo "FAIL: $f missing from the build"; exit 1; }
+          done
+          grep -q 'jsx-runtime' dist/components/WorkshopEnv.js \
+            || { echo 'FAIL: JSX was not transformed'; exit 1; }
+          grep -qE '^\s*(type|interface) ' dist/components/WorkshopEnv.js \
+            && { echo 'FAIL: type syntax survived into the emitted JS'; exit 1; }
+          node -e "
+            const p = require('./package.json');
+            for (const k of ['./components/WorkshopEnv', './components/WorkshopHome']) {
+              const e = p.exports[k];
+              if (!e || !String(e.default).startsWith('./dist/')) {
+                throw new Error(k + ' must be exported from ./dist, got ' + JSON.stringify(e));
+              }
+            }
+            console.log('exports point at dist');
+          "
+
       - name: Every command module parses
         run: |
           for f in bin/workshop-kit.mjs src/index.mjs src/config/*.mjs src/commands/*.mjs tools/tenant-pulse-dashboard/server.mjs; do

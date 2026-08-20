@@ -1,0 +1,24 @@
+{
+  // Emits the shared React components as plain JS plus declarations.
+  //
+  // Shipping raw .tsx does not work once the kit is a real install: webpack
+  // excludes node_modules from transpilation, so the JSX and type annotations
+  // reach the parser verbatim and the build fails. It appeared to work only
+  // because a `file:` dependency is a symlink, whose real path sits outside
+  // node_modules and so does get transpiled.
+  "extends": "@docusaurus/tsconfig",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "rootDir": "src",
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src/components/**/*.tsx", "src/components/**/*.ts"]
+}

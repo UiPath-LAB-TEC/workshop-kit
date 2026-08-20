@@ -68,6 +68,19 @@ were verified to fail when that behaviour is broken.
 Every command resolves the *consumer* repo from `process.cwd()`, never from its
 own location on disk — it runs from inside `node_modules`.
 
+## Why the components are compiled
+
+`npm run build` emits `src/components/*.tsx` to `dist/` as plain JS plus
+declarations, and `prepare` runs it automatically — including when a consumer
+installs the kit from a git tag.
+
+This is not optional. Docusaurus excludes `node_modules` from transpilation, so a
+package that ships raw `.tsx` fails to parse in a consumer's build. It appears to
+work under a `file:` dependency only because that is a symlink whose real path
+lies outside `node_modules`, and therefore does get transpiled. Test packaging
+changes against a real install (`npm pack`, then install the tarball), never
+against a `file:` link.
+
 ## Versioning
 
 - `agents/base.md` wording, or a new optional config field → **minor**
