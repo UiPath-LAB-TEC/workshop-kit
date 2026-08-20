@@ -1,0 +1,98 @@
+# The kit's own CI. validate.yml checks content repos; this checks the kit itself,
+# so a change that would break all three is caught before any of them see it.
+name: Kit CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck the shared components
+        run: npm run typecheck
+
+      - name: Every command module parses
+        run: |
+          for f in bin/workshop-kit.mjs src/index.mjs src/config/*.mjs src/commands/*.mjs tools/tenant-pulse-dashboard/server.mjs; do
+            node --check "$f"
+          done
+
+      - name: CLI responds
+        run: |
+          node bin/workshop-kit.mjs --version
+          node bin/workshop-kit.mjs --help
+
+      # The fence composer is the piece that silently corrupts a repo's AGENTS.md
+      # if it regresses, so exercise it end to end on a scratch fixture.
+      - name: AGENTS.md fence round-trip
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          printf '# AGENTS.md instructions\n\n## General Workshop Instructions\n\nold forked copy\n\n## Project-Specific Instructions - Fixture\n\n- product content\n' > "$work/AGENTS.md"
+
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents init )
+          grep -q 'product content' "$work/AGENTS.md" || { echo 'FAIL: product content lost'; exit 1; }
+          grep -q 'old forked copy' "$work/AGENTS.md" && { echo 'FAIL: stale General section kept'; exit 1; }
+
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents check )
+
+          # A change inside the fence must fail; a change below it must not.
+          # perl -pi rather than sed -i: portable across GNU and BSD, so this whole
+          # step can also be run locally before pushing.
+          perl -pi -e 's/This section is shared workshop guidance\./tampered./' "$work/AGENTS.md"
+          if ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents check ); then
+            echo 'FAIL: tampered fence passed the check'; exit 1
+          fi
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents build )
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents check )
+
+          printf '\n- an edit below the fence\n' >> "$work/AGENTS.md"
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" agents check )
+          echo 'fence round-trip OK'
+
+      # zip-downloads is the highest blast radius component: a regression ships
+      # broken files to workshop attendees.
+      - name: ZIP pipeline renders tokens and warns on loose files
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          mkdir -p "$work/config" "$work/downloads/project"
+          cat > "$work/config/workshop-targets.json" <<'JSON'
+          {
+            "title": "Fixture", "tagline": "t", "repo": "org/repo",
+            "defaultTarget": "local",
+            "extraFields": {"codexModel": {"type": "string", "token": "WORKSHOP_CODEX_MODEL"}},
+            "targets": {"local": {
+              "siteUrl": "http://localhost:3000", "baseUrl": "/",
+              "workshop": {"uipathOrgName": "org", "uipathTenantName": "tenant",
+                "uipathTenantUrl": "https://example.invalid/org/tenant",
+                "orchestratorParentFolder": "Shared", "codexModel": "m"},
+              "codedApp": {"name": "fixture"}
+            }}
+          }
+          JSON
+          printf 'org={{WORKSHOP_UIPATH_ORG_NAME}} model={{WORKSHOP_CODEX_MODEL}} keep={{WORKSHOP_UNDECLARED}}\n' > "$work/downloads/project/AGENTS.md"
+          printf 'loose\n' > "$work/downloads/stray.md"
+
+          out="$( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" zip-downloads 2>&1 )"
+          echo "$out"
+          echo "$out" | grep -q 'stray.md is not inside a directory' || { echo 'FAIL: no loose-file warning'; exit 1; }
+
+          unzip -p "$work/static/downloads/project.zip" AGENTS.md > "$work/got.txt"
+          grep -q 'org=org' "$work/got.txt" || { echo 'FAIL: base token not rendered'; exit 1; }
+          grep -q 'model=m' "$work/got.txt" || { echo 'FAIL: extraFields token not rendered'; exit 1; }
+          grep -q 'keep={{WORKSHOP_UNDECLARED}}' "$work/got.txt" || { echo 'FAIL: undeclared token should stay literal'; exit 1; }
+          grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
+          echo 'zip pipeline OK'

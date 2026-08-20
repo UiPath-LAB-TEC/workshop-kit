@@ -38,9 +38,32 @@ workshop-kit build --target <name>
 workshop-kit codedapp <check|pack|publish|deploy|all>
 workshop-kit preview --target <name>
 workshop-kit pulse
+workshop-kit validate-config          check every target in config/workshop-targets.json
 workshop-kit doctor
 workshop-kit init --product <slug>
 ```
+
+## CI
+
+`.github/workflows/validate.yml` is a reusable `workflow_call` workflow. A content
+repo's entire CI is:
+
+```yaml
+jobs:
+  validate:
+    uses: UiPath-LAB-TEC/workshop-kit/.github/workflows/validate.yml@v1
+    secrets: inherit
+```
+
+It runs `agents check`, `validate-config`, `check:doc-assets`,
+`check:workshop-vars`, `typecheck`, a build, and `doctor`. Because the kit repo is
+private, it needs a `KIT_READ_TOKEN` secret that can read it, so npm can resolve
+the dependency.
+
+`.github/workflows/kit-ci.yml` checks the kit itself, including end-to-end
+exercises of the two components that fail expensively: the `AGENTS.md` fence
+composer and the ZIP pipeline's token rendering. Both assert on real behaviour and
+were verified to fail when that behaviour is broken.
 
 Every command resolves the *consumer* repo from `process.cwd()`, never from its
 own location on disk — it runs from inside `node_modules`.

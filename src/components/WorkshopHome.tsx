@@ -1,3 +1,10 @@
+/// <reference types="@docusaurus/module-type-aliases" />
+/// <reference types="@docusaurus/theme-classic" />
+// The two references above are load-bearing from BOTH sides. A Docusaurus site
+// gets these ambient declarations from its generated .docusaurus/ directory, but a
+// consumer's `tsc` follows the re-export shim into this file and typechecks it with
+// the CONSUMER's tsconfig, which has no reason to know about them. Declaring them
+// here means neither the kit nor any content repo needs extra tsconfig setup.
 /**
  * Shared workshop landing page. The only thing that differed between the three
  * repos was the meta description string, which now derives from siteConfig.title.

@@ -1,0 +1,84 @@
+# Reusable validation for every workshop content repo.
+#
+# A content repo's whole CI is a three-line file that calls this. When the kit
+# changes, one edit here changes what every workshop is checked against, and
+# Dependabot surfaces the release as a PR in each repo so the shared change is
+# immediately tested against real content.
+name: Validate workshop
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node version to build with.
+        required: false
+        type: string
+        default: '20'
+      target:
+        description: Workshop target to build. Keep this a local/offline target.
+        required: false
+        type: string
+        default: ''
+    secrets:
+      KIT_READ_TOKEN:
+        description: >
+          Token that can read the private workshop-kit repo, so npm can resolve
+          the dependency. Not needed once the kit is public or installed from a
+          registry the default token can reach.
+        required: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      # The kit lives in a private repo, so plain `npm ci` cannot clone it with
+      # the default token. Rewrite the git URL to carry a token that can.
+      # The `secrets` context is not available in a step-level `if`, so the token
+      # is mapped to env first and the condition tests that.
+      - name: Authenticate to the kit repo
+        env:
+          KIT_READ_TOKEN: ${{ secrets.KIT_READ_TOKEN }}
+        if: env.KIT_READ_TOKEN != ''
+        run: |
+          git config --global \
+            url."https://x-access-token:${KIT_READ_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+
+      - name: Install
+        run: npm ci
+
+      # Fails if AGENTS.md's fenced region has drifted from the kit's base.md, or
+      # was hand-edited inside the fence. Prints a diff rather than just "stale".
+      - name: AGENTS.md is in sync with the shared base
+        run: npx workshop-kit agents check
+
+      - name: Validate workshop targets
+        run: npx workshop-kit validate-config
+
+      - name: Doc assets exist
+        run: npx workshop-kit check:doc-assets
+
+      - name: Workshop variables line up
+        run: npx workshop-kit check:workshop-vars
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: |
+          if [ -n "${{ inputs.target }}" ]; then
+            npm run build:target -- "${{ inputs.target }}"
+          else
+            npm run build
+          fi
+
+      - name: Report kit version
+        if: always()
+        run: npx workshop-kit doctor

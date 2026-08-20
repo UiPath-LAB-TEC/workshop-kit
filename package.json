@@ -1,6 +1,6 @@
 {
   "name": "@uipath-lab-tec/workshop-kit",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Shared Docusaurus infrastructure for UiPath LAB TEC workshop repos.",
   "license": "UNLICENSED",
   "type": "module",
@@ -46,7 +46,16 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.1",
+    "@docusaurus/tsconfig": "3.10.1",
     "@docusaurus/types": "3.10.1",
-    "typescript": "~6.0.2"
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "typescript": "~6.0.2",
+    "@docusaurus/theme-classic": "3.10.1"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "validate": "node bin/workshop-kit.mjs --version && npm run typecheck"
   }
 }

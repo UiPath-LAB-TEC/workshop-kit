@@ -24,6 +24,7 @@ const USAGE = `workshop-kit <command>
   preview [<target>] [<port>]  serve build/ at the target's baseUrl
   codedapp <check|pack|publish|deploy|all>
   pulse                        tenant pulse dashboard
+  validate-config              check every target in config/workshop-targets.json
   doctor                       report kit version, resolved target and drift
   init --product <slug>        scaffold a new workshop repo
 
@@ -159,6 +160,11 @@ async function main() {
 
     case 'pulse':
       return runScript('tools/tenant-pulse-dashboard/server.mjs', argv);
+
+    case 'validate-config': {
+      const {validateConfig} = await import(join(commandsDir, 'validate-config.mjs'));
+      return validateConfig({});
+    }
 
     case 'doctor': {
       const {doctor} = await import(join(commandsDir, 'doctor.mjs'));
