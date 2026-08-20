@@ -79,7 +79,7 @@ export function workshopPayload(fields, target) {
   return Object.fromEntries(fields.map(({field}) => [field, target.workshop?.[field]]));
 }
 
-/** `{'{{WORKSHOP_UIPATH_ORG_NAME}}': 'growthuipath', ...}` for text substitution. */
+/** `{'{{WORKSHOP_UIPATH_ORG_NAME}}': '<org-name>', ...}` for text substitution. */
 export function tokenValueMap(fields, target) {
   return Object.fromEntries(
     fields.map(({field, token}) => [`{{${token}}}`, target.workshop?.[field] ?? '']),
