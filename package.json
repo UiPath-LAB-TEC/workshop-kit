@@ -1,6 +1,6 @@
 {
   "name": "@uipath-lab-tec/workshop-kit",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Shared Docusaurus infrastructure for UiPath LAB TEC workshop repos.",
   "license": "UNLICENSED",
   "type": "module",
