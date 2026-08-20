@@ -25,7 +25,7 @@ const USAGE = `workshop-kit <command>
   codedapp <check|pack|publish|deploy|all>
   pulse                        tenant pulse dashboard
   validate-config              check every target in config/workshop-targets.json
-  doctor                       report kit version, resolved target and drift
+  doctor [target]              report kit version, resolved target and drift
   init --product <slug> [--title <t>]   scaffold a new workshop repo
 
   --help, --version
@@ -167,8 +167,12 @@ async function main() {
     }
 
     case 'doctor': {
+      // Accepts a target the same way build/start/preview do. Without this it
+      // silently reported the default target while the caller believed they
+      // were inspecting the one they named.
+      const target = takeTarget(argv);
       const {doctor} = await import(join(commandsDir, 'doctor.mjs'));
-      return doctor({});
+      return doctor({target});
     }
 
     case 'init': {
