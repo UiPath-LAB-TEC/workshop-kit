@@ -1,0 +1,24 @@
+{
+  "$schema": "../node_modules/@uipath-lab-tec/workshop-kit/schemas/workshop-targets.schema.json",
+  "title": "__PRODUCT_TITLE__",
+  "tagline": "Hands-on exercises for __PRODUCT_TITLE__",
+  "repo": "UiPath-LAB-TEC/workshop-__PRODUCT_SLUG__",
+  "docsLabel": "__PRODUCT_TITLE__ Docs",
+  "defaultTarget": "local",
+  "targets": {
+    "local": {
+      "siteUrl": "http://localhost:3000",
+      "baseUrl": "/",
+      "workshop": {
+        "uipathOrgName": "REPLACE_ME",
+        "uipathTenantName": "REPLACE_ME",
+        "uipathTenantUrl": "https://cloud.uipath.com/REPLACE_ME/REPLACE_ME",
+        "orchestratorParentFolder": "Shared"
+      },
+      "codedApp": {
+        "name": "workshop-__PRODUCT_SLUG__-local",
+        "description": "Local build of the __PRODUCT_TITLE__ Docusaurus site"
+      }
+    }
+  }
+}

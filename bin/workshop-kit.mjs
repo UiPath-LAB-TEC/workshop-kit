@@ -26,7 +26,7 @@ const USAGE = `workshop-kit <command>
   pulse                        tenant pulse dashboard
   validate-config              check every target in config/workshop-targets.json
   doctor                       report kit version, resolved target and drift
-  init --product <slug>        scaffold a new workshop repo
+  init --product <slug> [--title <t>]   scaffold a new workshop repo
 
   --help, --version
 `;
@@ -173,7 +173,7 @@ async function main() {
 
     case 'init': {
       const {init} = await import(join(commandsDir, 'init.mjs'));
-      return init({product: takeFlag(argv, '--product')});
+      return init({product: takeFlag(argv, '--product'), title: takeFlag(argv, '--title')});
     }
 
     default:

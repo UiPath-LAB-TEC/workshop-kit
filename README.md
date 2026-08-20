@@ -24,7 +24,7 @@ src/css/                 shared stylesheet
 agents/base.md           THE shared "General Workshop Instructions"
 schemas/                 JSON Schema for config/workshop-targets.json
 tools/                   tenant pulse dashboard
-template/                scaffold for `workshop-kit init`
+template/                scaffold for `workshop-kit init` (a complete, building site)
 ```
 
 ## CLI
@@ -67,6 +67,27 @@ were verified to fail when that behaviour is broken.
 
 Every command resolves the *consumer* repo from `process.cwd()`, never from its
 own location on disk — it runs from inside `node_modules`.
+
+## Starting a new workshop
+
+```bash
+npx workshop-kit init --product <slug> [--title "UiPath X Workshop"]
+cd workshop-<slug> && npm install
+npx workshop-kit agents init
+```
+
+That produces a repo that builds immediately with placeholder content: three
+pages, the shared stylesheet, and the full check pipeline passing. The kit pin is
+stamped with the version that scaffolded it, so a new workshop starts from a
+known-good release.
+
+The whole of a new repo's infrastructure is three pointer files —
+`docusaurus.config.ts` (6 lines), `src/pages/index.tsx` (1 line), and
+`src/components/WorkshopEnv.tsx` (3 lines) — plus `config/workshop-targets.json`.
+Everything else is content.
+
+Replace the `REPLACE_ME` tenant values before delivering; `validate-config`
+deliberately passes with them in place, since it cannot know what is real.
 
 ## Why the components are compiled
 

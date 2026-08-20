@@ -1,0 +1,68 @@
+{
+  "name": "workshop-__PRODUCT_SLUG__",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "prepare:docs": "workshop-kit prepare",
+    "target:check": "workshop-kit doctor",
+    "prestart": "npm run prepare:docs",
+    "start": "docusaurus start",
+    "start:target": "workshop-kit start",
+    "preview:target": "workshop-kit preview",
+    "prebuild": "npm run prepare:docs",
+    "build": "docusaurus build",
+    "build:target": "workshop-kit build",
+    "agents:check": "workshop-kit agents check",
+    "check:doc-assets": "workshop-kit check:doc-assets",
+    "check:workshop-vars": "workshop-kit check:workshop-vars",
+    "check:tenant-access": "workshop-kit check:tenant-access",
+    "zip:downloads": "workshop-kit zip-downloads",
+    "codedapp:check": "workshop-kit codedapp check",
+    "codedapp:pack": "workshop-kit codedapp pack",
+    "codedapp:publish": "workshop-kit codedapp publish",
+    "codedapp:deploy": "workshop-kit codedapp deploy",
+    "deploy:uipath": "workshop-kit codedapp all",
+    "tenant:pulse": "workshop-kit pulse",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve",
+    "write-translations": "docusaurus write-translations",
+    "write-heading-ids": "docusaurus write-heading-ids",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.10.1",
+    "@docusaurus/faster": "3.10.1",
+    "@docusaurus/preset-classic": "3.10.1",
+    "@mdx-js/react": "^3.0.0",
+    "@uipath-lab-tec/workshop-kit": "__KIT_SPEC__",
+    "clsx": "^2.0.0",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.1",
+    "@docusaurus/tsconfig": "3.10.1",
+    "@docusaurus/types": "3.10.1",
+    "@types/react": "^19.0.0",
+    "typescript": "~6.0.2"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0"
+  }
+}

@@ -151,12 +151,17 @@ export function agentsInit({root = process.cwd()} = {}) {
   }
 
   const product = existing.slice(productMatch.index).trimEnd();
-  const dropped = existing.slice(0, productMatch.index).trimEnd().split('\n').length;
+  const preamble = existing.slice(0, productMatch.index).trim();
+  const dropped = preamble ? preamble.split('\n').length : 0;
   writeFileSync(agentsPath, `${block}\n\n${product}\n`);
 
   return {
     created: true,
     dropped,
-    message: `Wrote ${agentsPath}: shared base fenced above ${product.split('\n').length} lines of product content; replaced ${dropped} lines of the old forked General section.`,
+    message:
+      `Wrote ${agentsPath}: shared base fenced above ${product.split('\n').length} lines of product content` +
+      // A freshly scaffolded repo has no forked General section to replace, and
+      // saying it replaced one is just confusing.
+      (dropped > 0 ? `; replaced ${dropped} lines of the old forked General section.` : '.'),
   };
 }

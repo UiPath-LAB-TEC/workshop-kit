@@ -2,12 +2,20 @@
 /**
  * Scaffolds a new workshop repo from template/.
  *
- * Deliberately minimal for now: the template is only partially populated, and
- * fleshing it out is its own migration stage. It refuses rather than producing a
- * repo that looks complete and is not.
+ * The point of this command is that the next workshop is not another fork. Every
+ * file it writes is either content to replace or a three-line pointer at the kit.
  */
-import {existsSync, readdirSync, cpSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {join, dirname} from 'node:path';
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  cpSync,
+  mkdirSync,
+  renameSync,
+  statSync,
+} from 'node:fs';
+import {join, dirname, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import process from 'node:process';
 
@@ -19,9 +27,32 @@ const REQUIRED_TEMPLATE_FILES = [
   'docusaurus.config.ts',
   'sidebars.ts',
   'config/workshop-targets.json',
+  'AGENTS.md',
+  'docs/overview.md',
 ];
 
-export function init({product, root = process.cwd()} = {}) {
+/** Files that carry __PLACEHOLDER__ tokens. Binary assets are copied untouched. */
+const TEXT_EXTENSIONS = new Set(['.json', '.md', '.ts', '.tsx', '.mjs', '.js', '.css', '.example']);
+
+function titleFromSlug(slug) {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function walk(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, {withFileTypes: true})) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walk(full));
+    else out.push(full);
+  }
+  return out;
+}
+
+export function init({product, title, root = process.cwd()} = {}) {
   if (!product) {
     console.error('init needs --product <slug>, e.g. `workshop-kit init --product maestro`.');
     return 1;
@@ -31,16 +62,9 @@ export function init({product, root = process.cwd()} = {}) {
     return 1;
   }
 
-  const missing = REQUIRED_TEMPLATE_FILES.filter(
-    (file) => !existsSync(join(templateDir, file)),
-  );
+  const missing = REQUIRED_TEMPLATE_FILES.filter((f) => !existsSync(join(templateDir, f)));
   if (missing.length > 0) {
-    console.error(
-      `The scaffold is not complete yet, so \`init\` would produce a repo that does not build.\n` +
-        `Missing from template/: ${missing.join(', ')}\n\n` +
-        `Present today: ${readdirSync(templateDir).join(', ')}\n` +
-        `Populating the template is a separate step; until then, copy an existing workshop repo.`,
-    );
+    console.error(`The scaffold is incomplete. Missing from template/: ${missing.join(', ')}`);
     return 1;
   }
 
@@ -50,15 +74,60 @@ export function init({product, root = process.cwd()} = {}) {
     return 1;
   }
 
+  const kitVersion = JSON.parse(readFileSync(join(kitRoot, 'package.json'), 'utf8')).version;
+  const substitutions = {
+    __PRODUCT_SLUG__: product,
+    __PRODUCT_TITLE__: title || `UiPath ${titleFromSlug(product)} Workshop`,
+    // Pin the kit version that scaffolded this repo, so a new workshop starts
+    // from a known-good release rather than whatever is on a branch.
+    __KIT_SPEC__: `github:UiPath-LAB-TEC/workshop-kit#v${kitVersion}`,
+  };
+
   mkdirSync(dest, {recursive: true});
   cpSync(templateDir, dest, {recursive: true});
 
-  // .gitignore is stored unprefixed so it does not apply to the kit's own repo.
-  const gitignore = join(dest, 'gitignore');
-  if (existsSync(gitignore)) {
-    writeFileSync(join(dest, '.gitignore'), readFileSync(gitignore, 'utf8'));
+  // Stored unprefixed in the kit so it does not apply to the kit's own repo.
+  const storedIgnore = join(dest, 'gitignore');
+  if (existsSync(storedIgnore)) renameSync(storedIgnore, join(dest, '.gitignore'));
+
+  let substituted = 0;
+  for (const file of walk(dest)) {
+    const ext = file.slice(file.lastIndexOf('.'));
+    const base = file.slice(file.lastIndexOf('/') + 1);
+    if (!TEXT_EXTENSIONS.has(ext) && base !== '.gitignore') continue;
+    if (statSync(file).size > 512 * 1024) continue;
+
+    const before = readFileSync(file, 'utf8');
+    let after = before;
+    for (const [token, value] of Object.entries(substitutions)) {
+      after = after.split(token).join(value);
+    }
+    if (after !== before) {
+      writeFileSync(file, after);
+      substituted += 1;
+    }
   }
 
-  console.log(`Scaffolded ${dest}. Next: set title, tagline and repo in config/workshop-targets.json.`);
+  const leftovers = walk(dest).filter((file) => {
+    const ext = file.slice(file.lastIndexOf('.'));
+    if (!TEXT_EXTENSIONS.has(ext)) return false;
+    return /__[A-Z_]+__/.test(readFileSync(file, 'utf8'));
+  });
+  if (leftovers.length > 0) {
+    console.error(
+      `Unreplaced placeholders remain in:\n${leftovers.map((f) => `  ${relative(dest, f)}`).join('\n')}`,
+    );
+    return 1;
+  }
+
+  console.log(`Scaffolded ${dest}`);
+  console.log(`  title:       ${substitutions.__PRODUCT_TITLE__}`);
+  console.log(`  kit:         ${substitutions.__KIT_SPEC__}`);
+  console.log(`  substituted: ${substituted} file(s)`);
+  console.log('');
+  console.log('Next:');
+  console.log(`  cd workshop-${product} && npm install`);
+  console.log('  npx workshop-kit agents init      # add the shared AGENTS.md fence');
+  console.log('  # then replace the REPLACE_ME tenant values in config/workshop-targets.json');
   return 0;
 }
