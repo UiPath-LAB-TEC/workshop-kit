@@ -1,7 +1,8 @@
 /**
  * Docusaurus config factory. Owns everything the three workshop sites had
  * identical: the classic preset, themeConfig, navbar and footer shape,
- * onBrokenLinks, i18n, future flags, and the customFields.workshop wiring.
+ * onBrokenLinks/onBrokenAnchors, i18n, future flags, and the customFields.workshop
+ * wiring.
  *
  * A content repo's docusaurus.config.ts becomes:
  *
@@ -100,6 +101,12 @@ export function createWorkshopConfig(overrides = {}) {
     projectName,
 
     onBrokenLinks: 'throw',
+    // Set explicitly, though 'warn' is also the Docusaurus default: a renamed
+    // heading breaks every in-page link pointing at it, and a workshop
+    // accumulates that as exercises are reordered. Deliberately not 'throw' —
+    // a stale anchor is a content bug, not a reason to block a deploy the day
+    // of a workshop. Read the build output rather than trusting a green exit.
+    onBrokenAnchors: 'warn',
 
     i18n: {
       defaultLocale: 'en',
