@@ -212,9 +212,38 @@ against a `file:` link.
 
 ## Versioning
 
-- `agents/base.md` wording, or a new optional config field → **minor**
+- new CLI command, `agents/base.md` wording, or a new optional config field → **minor**
 - check or pipeline bug fix → **patch**
 - renamed component, removed config field, changed CLI flag → **major**
 
-Content repos pin a caret range and rely on Dependabot to surface kit releases,
-so a shared change is immediately CI-tested against every workshop.
+**The version number is a signal, not a trigger. Nothing updates on its own.**
+
+A content repo pins one exact tag:
+
+```json
+"@uipath-lab-tec/workshop-kit": "github:UiPath-LAB-TEC/workshop-kit#v1.3.0"
+```
+
+That is a tag, not a caret range, and it resolves through `package-lock.json` to
+a specific commit. Three consequences follow, and all three are deliberate:
+
+1. **Dependabot cannot bump it.** There is no registry to poll and no semver
+   range to compare for a `github:` tag dependency. The `dependabot.yml` in each
+   content repo covers `@docusaurus/*` and GitHub Actions only — a kit group
+   used to sit there doing nothing, which read as if the bumps were automatic.
+2. **`npm install` cannot bump it either.** The lockfile records the resolved
+   commit of the *previous* tag, so npm honours the lock, prints "changed 1
+   package", and keeps the old kit even after you edit `package.json`. See
+   "Releasing, and repinning consumers" above.
+3. **Only `workshop-kit repin <tag>` moves a repo**, and someone has to run it,
+   per repo, on purpose.
+
+So a **major** does not break every workshop the day it is tagged. It breaks the
+next repo that repins, whenever that is. A workshop already delivered can sit on
+an old tag indefinitely and keep building — which is the point, because a repo
+is often frozen mid-delivery while the kit moves on.
+
+The cost of that safety is that a shared fix is *not* live everywhere until you
+repin each repo. Cross-repo CI proves a change is safe; it does not deliver it.
+Treat "tag the kit" and "repin the consumers" as two separate jobs, and expect
+repos to sit on different tags in between.
