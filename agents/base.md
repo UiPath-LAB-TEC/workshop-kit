@@ -14,6 +14,33 @@ This section is shared workshop guidance. Keep it exactly the same across worksh
 - Keep edits narrow: only add content that significantly improves the exercise or workshop flow.
 - When an exercise has multiple possible paths, make the target org, tenant, folder, bucket, app, or automation surface explicit.
 
+### Shared Naming Conventions
+
+These names are identical in every workshop repo. A participant who has done one
+workshop should recognise the structure of the next one. Do not diverge locally;
+change the convention here and roll it out everywhere.
+
+- **The prerequisites page is titled `Prerequisites`.** Where a workshop splits its
+  prerequisites across several pages, title each one `Prerequisites - <Step>`, for
+  example `Prerequisites - Sign-in`. Never `Pre-req`, `Pre-reqs`, or a bare step
+  name. Body text that cross-references the page uses the same title verbatim.
+- **Every exercise page closes with `## Success check`.** One sentence-case
+  heading holding one checklist of what must be true before moving on. Do not add
+  a second near-duplicate section such as `Verification Checks` — fold those items
+  into the same list. A `## Recap` after it is optional, for a short narrative
+  wrap-up where one genuinely adds something. An up-front `## Requirements` or
+  `## Objectives` section is a different thing and may stay.
+- **Participant placeholders use angle brackets:** `<your-name>`, and
+  `<your-initials>` where initials specifically are wanted. Never `[participant
+  name]`, `[your-name]`, or `{{your-name}}`. Angle brackets read as replace-me and
+  cannot be mistaken for a build-time token.
+- **`{{ }}` is reserved for `{{WORKSHOP_*}}` substitution tokens.** Never use that
+  shape for anything a participant is supposed to replace by hand: it looks exactly
+  like a token that will be rendered at build time, and silently is not one.
+- **`sidebar_position` runs contiguously from 1**, in the same order as
+  `sidebars.ts`. Gaps are drift, even though the explicit sidebar hides them.
+- **Front matter `title` and the page `# H1` must match exactly.**
+
 ### Screenshots And Visual Evidence
 - Blur, crop, or replace sensitive data in screenshots before adding them to workshop materials. Verify what is sensitive data.
 - Do not expose customer names, emails, tenant IDs, org IDs, folder IDs, tokens, URLs with secrets, queue item data, or internal-only environment details unless the user explicitly approves.
@@ -70,11 +97,17 @@ an explicit CLI argument (`workshop-kit build <target>`), then the
 Other rules for these values:
 - Use `WorkshopValue`, `WorkshopLink`, or `WorkshopCodeBlock` from `src/components/WorkshopEnv.tsx` when showing these values in MDX.
 - In copyable prompts, use `WorkshopCodeBlock` and tokens such as `{{WORKSHOP_UIPATH_ORG_NAME}}` so rendered prompts include the current session values.
-- Keep participant-specific names such as participant folder names and exercise bucket names as explicit placeholders unless a dedicated workshop variable exists for them.
+- Keep participant-specific names such as participant folder names and exercise bucket names as explicit `<your-name>` placeholders unless a dedicated workshop variable exists for them.
+- **No delivery-specific literal belongs in `docs/`.** A tenant URL, an org, a join
+  link, a Studio Web template name, a cohort, a city or a date that changes between
+  deliveries goes in `config/workshop-targets.json` and renders through
+  `WorkshopValue` / `WorkshopLink`. Declare anything beyond the four base fields
+  under `extraFields`. If you find yourself typing a city or a month into a docs
+  page, add the variable instead.
 - When adding, renaming, or removing workshop variables or `WorkshopEnv` imports, run `npm run check:workshop-vars`; stale tokens, unknown fields, unused imports, and defined-but-unused workshop variables should fail the check.
 
 ### Exercise Design
-- Each exercise should have clear objectives, steps, success criteria, and verification checks.
+- Each exercise should have clear objectives, steps, and one closing `## Success check` list. See Shared Naming Conventions above.
 - Follow the project-specific convention for objective sections and learning objectives.
 - Include realistic prompts or participant inputs when the exercise calls for them; do not turn exercise pages into theory-heavy lessons unless asked.
 - Prefer deterministic, lightweight assets that are easy to recreate and reset.
@@ -84,11 +117,13 @@ Other rules for these values:
 ### Downloads And Assets
 - Participant source folders live under `downloads/<exercise>/`.
 - Each `downloads/<name>/` directory produces exactly one `static/downloads/<name>.zip`; name the directory for the ZIP participants receive.
+- Name a download for what is inside it, not just for the exercise number: `exercise-3-paystubs`, `exercise-2-taxonomy`, `workshop-project`. A participant with three ZIPs in their Downloads folder should be able to tell them apart.
 - Loose files placed directly at the `downloads/` root are not packaged into any ZIP and are skipped without failing the build.
 - Generated ZIP files are created under `static/downloads/` by `npm run zip:downloads`.
 - Downloaded project instructions such as `downloads/workshop-project/AGENTS.md` may use `{{WORKSHOP_*}}` tokens; the ZIP workflow must render them from the selected target before packaging.
 - Keep original filenames organized under `downloads/<exercise>` and rely on the build-time ZIP workflow where available.
 - Exercise pages should link their own relevant ZIP downloads close to the step or section that uses them.
+- Serve participant files from the site itself through `WorkshopDownloadLink`. Do not link an external file host such as Google Drive, Dropbox, or a SharePoint file: those links leak outside the repo, cannot be versioned with the content, and go stale between deliveries.
 - Track missing participant files in a project-specific checklist when downloads are still incomplete.
 
 ### Validation
