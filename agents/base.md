@@ -38,8 +38,36 @@ This section is shared workshop guidance. Keep it exactly the same across worksh
 - Verify MDX changes with `npm run build` when practical; the repo scripts should run the docs preparation and checks automatically. Before deploying a target, run `npm run build:target -- <target>`.
 
 ### Workshop Configuration Variables
-- Session-specific workshop values must come from `.env` via `docusaurus.config.ts` `customFields.workshop`; do not hard-code them in docs.
-- Required variables are `WORKSHOP_UIPATH_ORG_NAME`, `WORKSHOP_UIPATH_TENANT_NAME`, `WORKSHOP_UIPATH_TENANT_URL`, and `WORKSHOP_ORCHESTRATOR_PARENT_FOLDER`.
+
+There are three separate configuration surfaces. They are not interchangeable,
+and each has exactly one owner. If you are unsure where a value belongs, ask
+which of these three reads it.
+
+**1. `config/workshop-targets.json` — everything participants see. Committed.**
+- The single source for org name, tenant name, tenant URL and parent folder. Per target, under `targets.<name>.workshop`.
+- `createWorkshopConfig()` reads it at build time and publishes it as Docusaurus `customFields.workshop`; the `WorkshopEnv` components read it from there. Docs never see a file or an env var.
+- Every `workshop-kit` command reads the same file, so the CLI and the rendered site can never disagree.
+- Safe for participants to read. Never put a folder key, credential, token or any deployment-only value here.
+- Base fields are `uipathOrgName`, `uipathTenantName`, `uipathTenantUrl`, `orchestratorParentFolder`, rendered by the tokens `WORKSHOP_UIPATH_ORG_NAME`, `WORKSHOP_UIPATH_TENANT_NAME`, `WORKSHOP_UIPATH_TENANT_URL`, `WORKSHOP_ORCHESTRATOR_PARENT_FOLDER`. Declare anything extra under `extraFields`, which derives the token, the type and the payload from one place.
+
+**2. `.env.deploy.<target>` — deployment only. Git-ignored, never committed.**
+- Read by the `codedapp` commands and nothing else. It has no effect on the built site.
+- Supplies exactly three values: `UIPATH_FOLDER_KEY` (required to deploy), `UIPATH_CODEDAPP_VERSION` and `UIPATH_CODEDAPP_AUTHOR` (both optional).
+- An already-set process env var wins over the file.
+- Copy `.env.deploy.example` to `.env.deploy.<target>` to create one.
+
+**3. `.env` and `.env.<target>` — the tenant pulse dashboard only.**
+- Read by `workshop-kit pulse` and nothing else. Not by the build, not by the docs, not by deployment.
+- Supplies `WORKSHOP_TARGET`, `WORKSHOP_START`, `WORKSHOP_END`, `RE_CONTEXT`.
+- A plain `.env` does **not** feed workshop values into the site. If you find `WORKSHOP_UIPATH_*` keys in a `.env`, they are dead leftovers from before the kit; the values in `config/workshop-targets.json` are what actually render. Do not add them, and do not trust them when they are there.
+
+**Choosing the target.** All three layers are keyed by target name. Precedence is
+an explicit CLI argument (`workshop-kit build <target>`), then the
+`WORKSHOP_TARGET` env var, then `defaultTarget` in
+`config/workshop-targets.json`. `build:target` and `start:target` set
+`WORKSHOP_TARGET` for the Docusaurus process.
+
+Other rules for these values:
 - Use `WorkshopValue`, `WorkshopLink`, or `WorkshopCodeBlock` from `src/components/WorkshopEnv.tsx` when showing these values in MDX.
 - In copyable prompts, use `WorkshopCodeBlock` and tokens such as `{{WORKSHOP_UIPATH_ORG_NAME}}` so rendered prompts include the current session values.
 - Keep participant-specific names such as participant folder names and exercise bucket names as explicit placeholders unless a dedicated workshop variable exists for them.
