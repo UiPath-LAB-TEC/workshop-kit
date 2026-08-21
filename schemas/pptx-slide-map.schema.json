@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/UiPath-LAB-TEC/workshop-kit/schemas/pptx-slide-map.schema.json",
+  "title": "PPTX slide map",
+  "description": "Per-deck input to `workshop-kit extract-pptx`. Holds the only two things that were ever deck-specific in the extractor: which slides belong to which docs page, and how to name a slide's role. Optional -- without it every slide lands in one folder.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "deck": {
+      "type": "string",
+      "description": "Filename of the deck this map was written against, recorded in the manifest. Decks are not kept in the content repos, so this is the only trace of which revision the slide numbers came from."
+    },
+    "pages": {
+      "type": "array",
+      "description": "Slide-to-page assignment. A slide no rule claims goes to --default-page.",
+      "items": {
+        "type": "object",
+        "required": [
+          "page",
+          "slides"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "page": {
+            "type": "string",
+            "description": "Output folder name, normally the docs page slug (`exercise-1`, `pre-reqs`)."
+          },
+          "slides": {
+            "$ref": "#/definitions/slideSelector"
+          }
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "description": "Advisory `likely_exercise_role` per slide. First matching rule wins, so order is priority order. A slide matching nothing falls back to its page assignment.",
+      "items": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "slides": {
+            "$ref": "#/definitions/slideSelector"
+          },
+          "match": {
+            "type": "array",
+            "description": "Case-insensitive substrings tested against all text on the slide.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "slides"
+            ]
+          },
+          {
+            "required": [
+              "match"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "slideSelector": {
+      "type": "array",
+      "description": "Slide numbers, 1-based. An integer is one slide; \"N-M\" is an inclusive range.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "integer",
+            "minimum": 1
+          },
+          {
+            "type": "string",
+            "pattern": "^\\s*\\d+\\s*(-\\s*\\d+\\s*)?$"
+          }
+        ]
+      }
+    }
+  }
+}

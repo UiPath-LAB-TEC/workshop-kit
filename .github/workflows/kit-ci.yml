@@ -56,6 +56,9 @@ jobs:
           for f in bin/workshop-kit.mjs src/index.mjs src/config/*.mjs src/commands/*.mjs tools/tenant-pulse-dashboard/server.mjs; do
             node --check "$f"
           done
+          # Shared Python that no build step exercises, so nothing else would
+          # catch a syntax error in it before an author ran it against a deck.
+          python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])" tools/extract-pptx-assets.py
 
       - name: CLI responds
         run: |

@@ -1,6 +1,6 @@
 {
   "name": "@uipath-lab-tec/workshop-kit",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Shared Docusaurus infrastructure for UiPath LAB TEC workshop repos.",
   "license": "UNLICENSED",
   "type": "module",
@@ -23,6 +23,7 @@
     },
     "./css/workshop.css": "./src/css/workshop.css",
     "./schemas/workshop-targets.schema.json": "./schemas/workshop-targets.schema.json",
+    "./schemas/pptx-slide-map.schema.json": "./schemas/pptx-slide-map.schema.json",
     "./agents/base.md": "./agents/base.md",
     "./components/WorkshopHome": {
       "types": "./dist/components/WorkshopHome.d.ts",

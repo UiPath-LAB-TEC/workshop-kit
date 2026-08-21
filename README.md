@@ -22,8 +22,8 @@ src/commands/            one module per CLI subcommand
 src/components/          WorkshopEnv React components
 src/css/                 shared stylesheet
 agents/base.md           THE shared "General Workshop Instructions"
-schemas/                 JSON Schema for config/workshop-targets.json
-tools/                   tenant pulse dashboard
+schemas/                 JSON Schema for config/workshop-targets.json and the PPTX slide map
+tools/                   tenant pulse dashboard, PPTX asset extractor
 template/                scaffold for `workshop-kit init` (a complete, building site)
 ```
 
@@ -38,6 +38,7 @@ workshop-kit build --target <name>
 workshop-kit codedapp <check|pack|publish|deploy|all>
 workshop-kit preview --target <name>
 workshop-kit pulse
+workshop-kit extract-pptx --pptx <f> --output-root <d> --manifest <f>
 workshop-kit validate-config          check every target in config/workshop-targets.json
 workshop-kit doctor [target]
 workshop-kit repin <tag>              move a content repo onto a released kit tag
@@ -118,6 +119,57 @@ Everything else is content.
 
 Replace the `REPLACE_ME` tenant values before delivering; `validate-config`
 deliberately passes with them in place, since it cannot know what is real.
+
+## Extracting a workshop from a facilitator deck
+
+`workshop-kit extract-pptx` pulls screenshots, ordered text blocks and callout
+geometry out of a `.pptx` and writes a manifest beside them. Two workshops were
+built this way from a lab-guide deck.
+
+```bash
+npx workshop-kit extract-pptx \
+  --pptx ~/decks/5_\ CM\ Lab\ Guide.pptx \
+  --output-root static/img \
+  --manifest extraction/manifest.json \
+  --slide-map extraction/slide-map.json
+```
+
+Run it once without `--slide-map` first. Everything lands in
+`static/img/unassigned/`, which is what you want before you know where the
+exercise boundaries are. Then write the map and run it again:
+
+```json
+{
+  "deck": "5_ CM Lab Guide.pptx",
+  "pages": [
+    {"page": "pre-reqs", "slides": [2]},
+    {"page": "exercise-1", "slides": ["3-18"]},
+    {"page": "exercise-2", "slides": ["20-24"]}
+  ],
+  "roles": [
+    {"role": "answer-reveal", "match": ["answers"]},
+    {"role": "sign-in", "slides": [2]}
+  ]
+}
+```
+
+`schemas/pptx-slide-map.schema.json` has the full shape. The map is the *only*
+deck-specific input; it lives in the content repo, or nowhere at all once the
+docs are the source of truth, and the deck itself is never committed.
+
+Two things this tool exists to get right, both learned the hard way:
+
+- **Placeholder pictures count.** An image dropped into a PowerPoint content
+  placeholder is a `PlaceholderPicture` with `shape_type == PLACEHOLDER`, not
+  `PICTURE`. An earlier per-repo copy filtered on `shape_type` alone and silently
+  dropped 18 of 33 screenshots from one deck, with no error and no non-zero exit.
+- **Numbered callout ovals are separate shapes.** They vanish the moment a
+  screenshot is extracted on its own, so each is recorded as a percentage offset
+  inside the picture it overlaps, ready for `.workshop-click-marker` in MDX.
+
+`python-pptx` and `Pillow` are required, and are deliberately not project
+dependencies — this is a one-off authoring step, not part of any build. The
+command checks for them and prints the `pip install` line if they are absent.
 
 ## Why the components are compiled
 

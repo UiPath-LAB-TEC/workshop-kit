@@ -67,6 +67,7 @@ export function doctor({root = process.cwd(), target: explicitTarget} = {}) {
     'scripts/docusaurus-target.mjs',
     'scripts/uipath-codedapp-deploy.mjs',
     'scripts/check-tenant-access.mjs',
+    'scripts/extract-pptx-assets.py',
     'src/css/custom.css',
     'src/pages/index.module.css',
     'AGENTS.product.md',

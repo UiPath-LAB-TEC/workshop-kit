@@ -24,6 +24,8 @@ const USAGE = `workshop-kit <command>
   preview [<target>] [<port>]  serve build/ at the target's baseUrl
   codedapp <check|pack|publish|deploy|all>
   pulse                        tenant pulse dashboard
+  extract-pptx --pptx <f> --output-root <d> --manifest <f> [--slide-map <f>]
+                               pull screenshots, text and callout geometry from a deck
   validate-config              check every target in config/workshop-targets.json
   doctor [target]              report kit version, resolved target and drift
   repin <tag> [--no-verify]    move this repo to a kit tag, regenerate AGENTS.md, verify
@@ -161,6 +163,11 @@ async function main() {
 
     case 'pulse':
       return runScript('tools/tenant-pulse-dashboard/server.mjs', argv);
+
+    case 'extract-pptx': {
+      const {extractPptx} = await import(join(commandsDir, 'extract-pptx.mjs'));
+      return extractPptx({args: argv});
+    }
 
     case 'validate-config': {
       const {validateConfig} = await import(join(commandsDir, 'validate-config.mjs'));
