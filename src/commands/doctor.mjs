@@ -14,7 +14,7 @@ import {agentsCheck} from './agents-build.mjs';
 
 const kitRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export function doctor({root = process.cwd()} = {}) {
+export function doctor({root = process.cwd(), target: explicitTarget} = {}) {
   const kit = JSON.parse(readFileSync(join(kitRoot, 'package.json'), 'utf8'));
   const notes = [];
 
@@ -39,7 +39,7 @@ export function doctor({root = process.cwd()} = {}) {
   console.log(`default       ${config.defaultTarget}`);
 
   try {
-    const {targetName, target} = getTarget();
+    const {targetName, target} = getTarget(explicitTarget);
     console.log(`resolved      ${targetName} -> ${target.siteUrl}${target.baseUrl}`);
     console.log(`tenant check  ${target.requiresTenantAccess ? 'enabled' : 'disabled'} for this target`);
   } catch (error) {
