@@ -127,3 +127,47 @@ jobs:
           grep -q 'keep={{WORKSHOP_UNDECLARED}}' "$work/got.txt" || { echo 'FAIL: undeclared token should stay literal'; exit 1; }
           grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
           echo 'zip pipeline OK'
+
+      # The prune DELETES build artifacts, so it gets the same treatment as the
+      # ZIP pipeline. The case that matters is the second one: one repo packs a
+      # different app name per training target, and a global "keep the newest N"
+      # would destroy an older target's only package.
+      - name: Package prune keeps N per package name
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          mkdir -p "$work/.uipath"
+          cd "$work/.uipath"
+          # older <- -> newer, within each name
+          for f in only-once.0.1.0-20260101000000 \
+                   many.0.1.0-20260101000000 many.0.1.0-20260102000000 \
+                   many.0.1.0-20260103000000 many.0.1.0-20260104000000; do
+            echo x > "$f.nupkg"
+          done
+          touch -t 202601010000 only-once.0.1.0-20260101000000.nupkg
+          touch -t 202601010000 many.0.1.0-20260101000000.nupkg
+          touch -t 202601020000 many.0.1.0-20260102000000.nupkg
+          touch -t 202601030000 many.0.1.0-20260103000000.nupkg
+          touch -t 202601040000 many.0.1.0-20260104000000.nupkg
+          echo '{}' > app.config.json
+          echo 'not-a-package' > loose.nupkg
+
+          cd "$work"
+          node --input-type=module -e "
+            const {prunePackages} = await import('file://$GITHUB_WORKSPACE/src/commands/codedapp-deploy.mjs');
+            prunePackages();
+          "
+
+          # The single old package of a name never packed again must survive,
+          # even though four newer files exist under a different name.
+          [ -f .uipath/only-once.0.1.0-20260101000000.nupkg ] \
+            || { echo 'FAIL: pruned the only package of an untouched name'; exit 1; }
+          [ "$(ls .uipath/many.*.nupkg | wc -l)" -eq 3 ] \
+            || { echo 'FAIL: expected 3 survivors for "many"'; exit 1; }
+          [ -f .uipath/many.0.1.0-20260101000000.nupkg ] \
+            && { echo 'FAIL: oldest of the group survived'; exit 1; }
+          [ -f .uipath/many.0.1.0-20260104000000.nupkg ] \
+            || { echo 'FAIL: newest of the group was deleted'; exit 1; }
+          [ -f .uipath/app.config.json ] || { echo 'FAIL: app.config.json removed'; exit 1; }
+          [ -f .uipath/loose.nupkg ] || { echo 'FAIL: unparseable filename removed'; exit 1; }
+          echo 'package prune OK'

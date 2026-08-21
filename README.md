@@ -35,7 +35,7 @@ workshop-kit agents build             regenerate AGENTS.md from base + product
 workshop-kit agents check             fail if AGENTS.md is stale or hand-edited inside the fence
 workshop-kit check:tenant-access      advisory tenant permission report (never fails a build)
 workshop-kit build --target <name>
-workshop-kit codedapp <check|pack|publish|deploy|all>
+workshop-kit codedapp <check|pack|publish|deploy|all>   pack prunes old nupkgs
 workshop-kit preview --target <name>
 workshop-kit pulse
 workshop-kit extract-pptx --pptx <f> --output-root <d> --manifest <f>
@@ -119,6 +119,32 @@ Everything else is content.
 
 Replace the `REPLACE_ME` tenant values before delivering; `validate-config`
 deliberately passes with them in place, since it cannot know what is real.
+
+## Packing and deploying the Coded App
+
+`workshop-kit codedapp <check|pack|publish|deploy|all>` builds the site for a
+target and ships it as a UiPath Coded Web App. `check` prints the resolved
+target, app name and whether the deploy env is present, and touches nothing.
+
+Every `pack` writes a fresh timestamped `.uipath/<name>.<version>.nupkg`, and
+`uip` never removes one. Left alone that grows without bound — one repo reached
+147 MB across 21 files in two months. After a successful pack the kit keeps the
+newest **3 packages per package name** and deletes the rest, reporting what it
+removed. Override with `UIPATH_CODEDAPP_KEEP`; a value below 1 or non-numeric
+falls back to 3 with a warning.
+
+Per *name*, not per directory, because a repo packs a different app name per
+training target — `tc20260721-ca-workshop`, `ifca20260722-ca-workshop`, and so
+on. A global "keep the newest 3" would delete an older target's only package the
+moment you pack a different one, and `publish` is a separate command that runs
+against the local file, so that would break pack-now-publish-later. Grouping by
+name also guarantees the file the current run just produced survives.
+
+Local packages are build artifacts, not the deliverable: `publish` uploads to
+Orchestrator. `.uipath/` and `uipath.json` are gitignored in every content repo
+and must never be committed. Files in `.uipath/` that are not named
+`<name>.<semver>.nupkg` — including `app.config.json` and `metadata.json` — are
+left alone.
 
 ## Extracting a workshop from a facilitator deck
 
