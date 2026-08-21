@@ -26,6 +26,7 @@ const USAGE = `workshop-kit <command>
   pulse                        tenant pulse dashboard
   validate-config              check every target in config/workshop-targets.json
   doctor [target]              report kit version, resolved target and drift
+  repin <tag> [--no-verify]    move this repo to a kit tag, regenerate AGENTS.md, verify
   init --product <slug> [--title <t>]   scaffold a new workshop repo
 
   --help, --version
@@ -173,6 +174,13 @@ async function main() {
       const target = takeTarget(argv);
       const {doctor} = await import(join(commandsDir, 'doctor.mjs'));
       return doctor({target});
+    }
+
+    case 'repin': {
+      const tag = takeTarget(argv);
+      const skipChecks = argv.includes('--no-verify');
+      const {repin} = await import(join(commandsDir, 'repin.mjs'));
+      return repin({tag, skipChecks});
     }
 
     case 'init': {
