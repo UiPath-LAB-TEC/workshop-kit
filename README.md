@@ -39,9 +39,39 @@ workshop-kit codedapp <check|pack|publish|deploy|all>
 workshop-kit preview --target <name>
 workshop-kit pulse
 workshop-kit validate-config          check every target in config/workshop-targets.json
-workshop-kit doctor
+workshop-kit doctor [target]
+workshop-kit repin <tag>              move a content repo onto a released kit tag
 workshop-kit init --product <slug>
 ```
+
+## Releasing, and repinning consumers
+
+Tag the release and move the major tag:
+
+```bash
+git tag -a v1.3.0 -m 'v1.3.0' && git push origin v1.3.0
+git tag -fa v1 -m 'Moving major tag' && git push --force origin v1
+```
+
+Then, in each content repo, `workshop-kit repin v1.3.0`.
+
+Two traps that command exists to close:
+
+- **`npm install` alone does not repin.** `package-lock.json` records the
+  resolved *commit* of the previous tag, so npm honours the lock and keeps the
+  old kit even though `package.json` names a new tag. The install prints
+  "changed 1 package" and succeeds. Only the explicit
+  `npm install <pkg>@<spec>` form re-resolves; `repin` uses it and then asserts
+  the installed version matches the tag.
+- **A release that touches `agents/base.md` moves the AGENTS.md fence hash**, so
+  a repin that does not regenerate leaves `agents check` failing. `repin` does
+  both in one operation and expects them in one commit.
+
+Dependabot does **not** propose these bumps — it has no registry to poll and no
+semver range to compare for a `github:` tag dependency. Repinning is deliberate
+and manual by design; you are the kit author, so you already know when a release
+happened. Consumers are never forced to move: a delivered workshop can stay on
+an old tag indefinitely.
 
 ## CI
 
