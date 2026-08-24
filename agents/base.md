@@ -30,6 +30,17 @@ change the convention here and roll it out everywhere.
   into the same list. A `## Recap` after it is optional, for a short narrative
   wrap-up where one genuinely adds something. An up-front `## Requirements` or
   `## Objectives` section is a different thing and may stay.
+- **Coded App names must fit 32 characters, so keep the product slug to 15.**
+  `uip codedapp deploy` rejects a name over 32 characters, and `baseUrl` must
+  always equal `/<codedApp.name>/`, so the two move together. The standard
+  patterns spend most of the budget on fixed text: `workshop-<slug>-local` costs
+  15, `growth-<slug>-workshop` 16, and `staging-<slug>-workshop` 17. A 15-character
+  slug therefore fits every pattern; `case-management` is already at exactly 32 for
+  its staging form. Abbreviate in the slug rather than the prefix -- `comms-mining`,
+  not `communications-mining` -- because the prefix is what participants recognise
+  across workshops. `publish` happily accepts an over-long name and only `deploy`
+  refuses it, which leaves an orphan package behind, so `doctor` fails on this
+  first.
 - **Participant placeholders use angle brackets:** `<your-name>`, and
   `<your-initials>` where initials specifically are wanted. Never `[participant
   name]`, `[your-name]`, or `{{your-name}}`. Angle brackets read as replace-me and

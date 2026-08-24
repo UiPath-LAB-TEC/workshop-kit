@@ -20,6 +20,10 @@ import {fileURLToPath} from 'node:url';
 import process from 'node:process';
 
 const kitRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// `staging-<slug>-workshop` is the tightest standard pattern at 17 characters of
+// fixed text, against a 32-character Coded App name limit.
+const PRODUCT_SLUG_LIMIT = 15;
 const templateDir = join(kitRoot, 'template');
 
 const REQUIRED_TEMPLATE_FILES = [
@@ -59,6 +63,21 @@ export function init({product, title, root = process.cwd()} = {}) {
   }
   if (!/^[a-z0-9][a-z0-9-]*$/.test(product)) {
     console.error(`"${product}" is not a valid slug; use lowercase letters, digits and hyphens.`);
+    return 1;
+  }
+  // Caught here rather than at deploy time. The slug ends up inside every target's
+  // codedApp.name, and `uip codedapp deploy` refuses a name over 32 characters --
+  // after `publish` has already accepted it and left a package behind. The tightest
+  // standard pattern is `staging-<slug>-workshop`, which spends 17 on fixed text.
+  if (product.length > PRODUCT_SLUG_LIMIT) {
+    console.error(
+      `"${product}" is ${product.length} characters; keep the product slug to ${PRODUCT_SLUG_LIMIT}.\n` +
+        `  Coded App names are capped at 32 and the slug goes inside all of them:\n` +
+        `    workshop-${product}-local        ${`workshop-${product}-local`.length}\n` +
+        `    growth-${product}-workshop       ${`growth-${product}-workshop`.length}\n` +
+        `    staging-${product}-workshop      ${`staging-${product}-workshop`.length}\n` +
+        `  Abbreviate the slug, not the prefix: "comms-mining", not "communications-mining".`,
+    );
     return 1;
   }
 

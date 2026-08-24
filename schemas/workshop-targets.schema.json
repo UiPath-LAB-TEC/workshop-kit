@@ -134,7 +134,9 @@
           "properties": {
             "name": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "maxLength": 32,
+              "description": "Hard limit: uip codedapp deploy rejects names over 32 characters."
             },
             "description": {
               "type": "string"

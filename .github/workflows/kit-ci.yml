@@ -128,6 +128,44 @@ jobs:
           grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
           echo 'zip pipeline OK'
 
+      # The 32-char Coded App name limit is enforced in validateTarget, which every
+      # command path reaches. It matters because `uip codedapp publish` ACCEPTS an
+      # over-long name and only `deploy` refuses it, leaving an orphan package in
+      # Orchestrator -- so the failure has to happen locally, before either runs.
+      - name: Coded App name length is enforced at the 32-char boundary
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          mkdir -p "$work/config"
+          write_target() {
+            cat > "$work/config/workshop-targets.json" <<JSON
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"local",
+           "targets":{"local":{"siteUrl":"http://localhost:3000","baseUrl":"/",
+           "workshop":{"uipathOrgName":"o","uipathTenantName":"t","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},
+           "codedApp":{"name":"$1","description":"d"}}}}
+          JSON
+          }
+          n32="$(printf 'a%.0s' $(seq 1 32))"
+          n33="$(printf 'a%.0s' $(seq 1 33))"
+
+          write_target "$n32"
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check >/dev/null 2>&1 ) \
+            || { echo 'FAIL: a 32-character name was rejected'; exit 1; }
+
+          write_target "$n33"
+          out="$( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check 2>&1 )" && {
+            echo 'FAIL: a 33-character name was accepted'; exit 1; }
+          echo "$out" | grep -q '33 characters' || { echo 'FAIL: error does not report the length'; exit 1; }
+
+          # init must refuse a slug that would blow the budget in any standard pattern.
+          slugdir="$(mktemp -d)"
+          ( cd "$slugdir" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" init --product communications-mining >/dev/null 2>&1 ) && {
+            echo 'FAIL: init accepted a 21-character slug'; exit 1; }
+          [ -z "$(ls -A "$slugdir")" ] || { echo 'FAIL: init left files behind after rejecting'; exit 1; }
+          ( cd "$slugdir" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" init --product comms-mining >/dev/null 2>&1 ) \
+            || { echo 'FAIL: init rejected a 12-character slug'; exit 1; }
+          echo 'name length rules OK'
+
       # This prune DELETES files from static/downloads/, so it is covered the same
       # way. The regression it guards: static/downloads/ is gitignored, so a stale
       # ZIP is invisible to CI and code review, yet `codedapp pack` packs the local

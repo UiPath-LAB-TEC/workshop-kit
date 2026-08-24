@@ -4,6 +4,12 @@ import path from 'node:path';
 import process from 'node:process';
 import {resolveFields} from './workshop-fields.mjs';
 
+// `uip codedapp deploy` refuses a longer name. `publish` does NOT -- it accepts the
+// name, creates the package, and only deploy rejects it, leaving an orphan package
+// in Orchestrator. So this is asserted here, in validateTarget, which every command
+// path reaches before any of them talks to a tenant.
+const CODED_APP_NAME_LIMIT = 32;
+
 // The consumer repo, not the kit: this file runs from inside node_modules.
 const root = process.cwd();
 const configPath = path.join(root, 'config', 'workshop-targets.json');
@@ -77,6 +83,15 @@ function validateTarget(targetName, target, config) {
 
   if (!target.baseUrl.startsWith('/') || !target.baseUrl.endsWith('/')) {
     throw new Error(`Target "${targetName}" baseUrl must start and end with "/".`);
+  }
+
+  const appName = target.codedApp.name;
+  if (appName.length > CODED_APP_NAME_LIMIT) {
+    throw new Error(
+      `Target "${targetName}" codedApp.name is ${appName.length} characters; the limit is ` +
+        `${CODED_APP_NAME_LIMIT}. Shorten the product slug rather than the prefix, which is ` +
+        `what participants recognise across workshops: "${appName}".`,
+    );
   }
 }
 
