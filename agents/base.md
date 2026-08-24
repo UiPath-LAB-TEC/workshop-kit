@@ -30,7 +30,19 @@ change the convention here and roll it out everywhere.
   into the same list. A `## Recap` after it is optional, for a short narrative
   wrap-up where one genuinely adds something. An up-front `## Requirements` or
   `## Objectives` section is a different thing and may stay.
-- **Coded App names must fit 32 characters, so keep the product slug to 15.**
+- **Coded App names are derived, and must fit 32 characters.** A target that omits
+  `codedApp.name` gets `<productSlug>-<uipathTenantName>`, normalised to lowercase
+  hyphens. The name is derived at config load rather than stored, so it cannot drift
+  between the build and the deploy: Docusaurus compiles `baseUrl` into every asset
+  path, the app is served at `/<name>/`, and a build and deploy that disagree give
+  you a site where every asset 404s. Set `codedApp.name` explicitly to override --
+  that is the escape hatch for a tenant whose name is too long to fit. Nothing is
+  truncated automatically, because truncating collides: two tenants differing only
+  by a date suffix truncate to the same name and would overwrite each other's app.
+  Two targets may never resolve to the same name, which matters because `local` and
+  a hosted target usually share a tenant -- give at least one of them an explicit
+  name.
+- **Keep the product slug to 15 characters.**
   `uip codedapp deploy` rejects a name over 32 characters, and `baseUrl` must
   always equal `/<codedApp.name>/`, so the two move together. The standard
   patterns spend most of the budget on fixed text: `workshop-<slug>-local` costs

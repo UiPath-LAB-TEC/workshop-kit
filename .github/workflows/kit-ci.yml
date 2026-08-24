@@ -128,6 +128,54 @@ jobs:
           grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
           echo 'zip pipeline OK'
 
+      # Derivation is the only reason two targets can silently share an app name, so
+      # the uniqueness guard is tested alongside it. `local` and a hosted target
+      # normally point at the SAME tenant, which is exactly the colliding shape.
+      - name: Coded App name derives from productSlug and tenant, uniquely
+        run: |
+          set -e
+          work="$(mktemp -d)"; mkdir -p "$work/config"
+          # $1 = extra top-level JSON, $2 = local's codedApp body, $3 = growth's
+          write() {
+            cat > "$work/config/workshop-targets.json" <<JSON
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"growth",$1
+           "targets":{
+            "local":{"siteUrl":"http://x","baseUrl":"/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{$2"description":"d"}},
+            "growth":{"siteUrl":"http://y","baseUrl":"/g/","workshop":{"uipathOrgName":"o","uipathTenantName":"Bellevue_July2026_20260727","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{$3"description":"d"}}}}
+          JSON
+          }
+          run() { ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check "$1" 2>&1 ); }
+
+          # derives, and normalises underscores + case
+          write '"productSlug":"ixp",' '"name":"ixp-local",' ''
+          run growth | grep -q 'Coded App name: ixp-bellevue-july2026-20260727' \
+            || { echo 'FAIL: did not derive/normalise'; exit 1; }
+
+          # an explicit name always wins
+          write '"productSlug":"ixp",' '"name":"ixp-local",' '"name":"hand-written",'
+          run growth | grep -q 'Coded App name: hand-written' || { echo 'FAIL: explicit name ignored'; exit 1; }
+
+          # no productSlug and no name is still a missing-field error
+          write '' '"name":"ixp-local",' ''
+          run growth 2>&1 | grep -q 'missing required fields: codedApp.name' \
+            || { echo 'FAIL: absent name not reported'; exit 1; }
+
+          # a derived name over 32 fails, and says it was derived
+          write '"productSlug":"case-management",' '"name":"cm-local",' ''
+          out="$(run growth)" && { echo 'FAIL: over-long derived name accepted'; exit 1; }
+          echo "$out" | grep -q 'derived from productSlug' || { echo 'FAIL: error does not say it was derived'; exit 1; }
+
+          # two targets resolving to one name is refused (same tenant, both derived)
+          cat > "$work/config/workshop-targets.json" <<'JSON'
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"growth","productSlug":"ixp",
+           "targets":{
+            "local":{"siteUrl":"http://x","baseUrl":"/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{"description":"d"}},
+            "growth":{"siteUrl":"http://y","baseUrl":"/g/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{"description":"d"}}}}
+          JSON
+          out="$(run growth)" && { echo 'FAIL: colliding app names accepted'; exit 1; }
+          echo "$out" | grep -q 'both resolve to codedApp.name' || { echo 'FAIL: collision not reported'; exit 1; }
+          echo 'name derivation OK'
+
       # The 32-char Coded App name limit is enforced in validateTarget, which every
       # command path reaches. It matters because `uip codedapp publish` ACCEPTS an
       # over-long name and only `deploy` refuses it, leaving an orphan package in

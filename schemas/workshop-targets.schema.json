@@ -70,6 +70,12 @@
     "docsLabel": {
       "type": "string",
       "description": "Footer Docs link label. Defaults to 'Workshop Docs'."
+    },
+    "productSlug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "maxLength": 15,
+      "description": "Product slug used to derive codedApp.name as <productSlug>-<uipathTenantName> for any target that does not set one explicitly. Capped at 15 so the derived name fits the 32-character limit for typical tenant names."
     }
   },
   "definitions": {
@@ -127,16 +133,13 @@
         },
         "codedApp": {
           "type": "object",
-          "required": [
-            "name"
-          ],
           "additionalProperties": false,
           "properties": {
             "name": {
               "type": "string",
               "minLength": 1,
               "maxLength": 32,
-              "description": "Hard limit: uip codedapp deploy rejects names over 32 characters."
+              "description": "Optional when the config sets productSlug: then it defaults to <productSlug>-<uipathTenantName>. An explicit value always wins, which is the escape hatch for tenant names too long to fit. Hard limit: uip codedapp deploy rejects names over 32 characters."
             },
             "description": {
               "type": "string"

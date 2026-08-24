@@ -3,6 +3,7 @@
   "title": "__PRODUCT_TITLE__",
   "tagline": "Hands-on exercises for __PRODUCT_TITLE__",
   "repo": "UiPath-LAB-TEC/workshop-__PRODUCT_SLUG__",
+  "productSlug": "__PRODUCT_SLUG__",
   "docsLabel": "__PRODUCT_TITLE__ Docs",
   "defaultTarget": "local",
   "targets": {
