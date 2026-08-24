@@ -128,6 +128,64 @@ jobs:
           grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
           echo 'zip pipeline OK'
 
+      # This prune DELETES files from static/downloads/, so it is covered the same
+      # way. The regression it guards: static/downloads/ is gitignored, so a stale
+      # ZIP is invisible to CI and code review, yet `codedapp pack` packs the local
+      # build/ dir that Docusaurus fills from static/ -- so it still reaches the
+      # deployed site.
+      - name: ZIP prune removes orphans, spares current zips and non-zips
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          mkdir -p "$work/config" "$work/downloads/keep-me" "$work/static/downloads"
+          cat > "$work/config/workshop-targets.json" <<'JSON'
+          {
+            "title": "Fixture", "tagline": "t", "repo": "org/repo",
+            "defaultTarget": "local",
+            "targets": {"local": {
+              "siteUrl": "http://localhost:3000", "baseUrl": "/",
+              "workshop": {"uipathOrgName": "org", "uipathTenantName": "tenant",
+                "uipathTenantUrl": "https://example.invalid/org/tenant",
+                "orchestratorParentFolder": "Shared"},
+              "codedApp": {"name": "fixture"}
+            }}
+          }
+          JSON
+          printf 'content\n' > "$work/downloads/keep-me/file.txt"
+          : > "$work/static/downloads/orphan.zip"
+          : > "$work/static/downloads/notes.txt"
+          # Seed the CURRENT zip too. This models a rebuild, which is the only
+          # state in which a prune that ignores its keep-set is observable: on a
+          # fresh tree there is no current zip present for it to wrongly delete.
+          : > "$work/static/downloads/keep-me.zip"
+
+          out="$( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" zip-downloads 2>&1 )"
+          echo "$out"
+          echo "$out" | grep -q 'Removed orphaned static/downloads/orphan.zip' || { echo 'FAIL: orphan not reported'; exit 1; }
+          [ -e "$work/static/downloads/orphan.zip" ] && { echo 'FAIL: orphan zip survived'; exit 1; }
+          [ -e "$work/static/downloads/keep-me.zip" ] || { echo 'FAIL: current zip missing'; exit 1; }
+          [ -e "$work/static/downloads/notes.txt" ] || { echo 'FAIL: non-zip file was deleted'; exit 1; }
+          # The prune runs BEFORE generation, so deleting a current zip is invisible
+          # by file existence alone -- it is immediately recreated. Assert on the log
+          # instead, or a prune that ignores its keep-set passes unnoticed.
+          echo "$out" | grep -q 'Removed orphaned static/downloads/keep-me.zip' && { echo 'FAIL: current zip reported as orphaned'; exit 1; }
+
+          # Emptying downloads/ makes every remaining zip an orphan. This is the
+          # exact shape of the CA bug: the folder was deleted, the zip was not.
+          rm -rf "$work/downloads/keep-me"
+          out2="$( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" zip-downloads 2>&1 )"
+          echo "$out2"
+          [ -e "$work/static/downloads/keep-me.zip" ] && { echo 'FAIL: zip survived deletion of its source folder'; exit 1; }
+          [ -e "$work/static/downloads/notes.txt" ] || { echo 'FAIL: non-zip file was deleted'; exit 1; }
+
+          # No downloads/ at all means the kit is not managing that directory, so
+          # it must not delete anything there.
+          rm -rf "$work/downloads"
+          : > "$work/static/downloads/untouched.zip"
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" zip-downloads >/dev/null 2>&1 )
+          [ -e "$work/static/downloads/untouched.zip" ] || { echo 'FAIL: pruned with no downloads/ dir'; exit 1; }
+          echo 'zip prune OK'
+
       # The prune DELETES build artifacts, so it gets the same treatment as the
       # ZIP pipeline. The case that matters is the second one: one repo packs a
       # different app name per training target, and a global "keep the newest N"
