@@ -8,3 +8,7 @@ npm-debug.log*
 
 # Build output
 /dist
+
+# Byte cache from the Python extractor
+__pycache__/
+*.pyc

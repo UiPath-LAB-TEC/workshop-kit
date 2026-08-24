@@ -50,6 +50,35 @@ function renderWorkshopTemplate(filePath) {
   writeFileSync(filePath, content);
 }
 
+/**
+ * Deletes `static/downloads/*.zip` files that no longer have a matching
+ * `downloads/<name>/` folder.
+ *
+ * Without this, deleting a download folder left its ZIP behind forever. That is
+ * not merely untidy: `static/downloads/` is gitignored, so CI never sees the
+ * stale file and no review catches it, but `codedapp pack` packs the local
+ * `build/` directory and Docusaurus copies all of `static/` into it. A ZIP
+ * orphaned on one machine therefore kept shipping to the deployed site. CA
+ * served `exercise-1.zip` and `exercise-2.zip` for a month that way.
+ *
+ * Only `.zip` files are considered, so anything else a repo chooses to put in
+ * `static/downloads/` is left alone.
+ */
+function pruneOrphanedZips(folderNames) {
+  if (!existsSync(staticDownloadsRoot)) return;
+
+  const expected = new Set(folderNames.map((name) => `${name}.zip`));
+  for (const entry of readdirSync(staticDownloadsRoot, {withFileTypes: true})) {
+    if (!entry.isFile() || !entry.name.endsWith('.zip')) continue;
+    if (expected.has(entry.name)) continue;
+
+    rmSync(join(staticDownloadsRoot, entry.name), {force: true});
+    console.log(
+      `Removed orphaned static/downloads/${entry.name} (no matching downloads/ folder)`,
+    );
+  }
+}
+
 /** Platform-aware archive command. From the IXP repo. */
 function archiveCommand(zipPath) {
   if (process.platform !== 'win32') {
@@ -90,6 +119,10 @@ for (const name of looseFiles) {
     `Warning: downloads/${name} is not inside a directory, so it was not packaged into any ZIP. Move it to downloads/<name>/ to ship it.`,
   );
 }
+
+// Before the early exit below: an emptied downloads/ means every ZIP present is
+// an orphan, and that is exactly the case that must still be cleaned.
+pruneOrphanedZips(downloadFolders);
 
 if (downloadFolders.length === 0) {
   console.log('No download folders found. Skipping ZIP generation.');

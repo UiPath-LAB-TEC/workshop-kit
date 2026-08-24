@@ -22,8 +22,8 @@ src/commands/            one module per CLI subcommand
 src/components/          WorkshopEnv React components
 src/css/                 shared stylesheet
 agents/base.md           THE shared "General Workshop Instructions"
-schemas/                 JSON Schema for config/workshop-targets.json
-tools/                   tenant pulse dashboard
+schemas/                 JSON Schema for config/workshop-targets.json and the PPTX slide map
+tools/                   tenant pulse dashboard, PPTX asset extractor
 template/                scaffold for `workshop-kit init` (a complete, building site)
 ```
 
@@ -35,9 +35,10 @@ workshop-kit agents build             regenerate AGENTS.md from base + product
 workshop-kit agents check             fail if AGENTS.md is stale or hand-edited inside the fence
 workshop-kit check:tenant-access      advisory tenant permission report (never fails a build)
 workshop-kit build --target <name>
-workshop-kit codedapp <check|pack|publish|deploy|all>
+workshop-kit codedapp <check|pack|publish|deploy|all>   pack prunes old nupkgs
 workshop-kit preview --target <name>
 workshop-kit pulse
+workshop-kit extract-pptx --pptx <f> --output-root <d> --manifest <f>
 workshop-kit validate-config          check every target in config/workshop-targets.json
 workshop-kit doctor [target]
 workshop-kit repin <tag>              move a content repo onto a released kit tag
@@ -119,6 +120,83 @@ Everything else is content.
 Replace the `REPLACE_ME` tenant values before delivering; `validate-config`
 deliberately passes with them in place, since it cannot know what is real.
 
+## Packing and deploying the Coded App
+
+`workshop-kit codedapp <check|pack|publish|deploy|all>` builds the site for a
+target and ships it as a UiPath Coded Web App. `check` prints the resolved
+target, app name and whether the deploy env is present, and touches nothing.
+
+Every `pack` writes a fresh timestamped `.uipath/<name>.<version>.nupkg`, and
+`uip` never removes one. Left alone that grows without bound — one repo reached
+147 MB across 21 files in two months. After a successful pack the kit keeps the
+newest **3 packages per package name** and deletes the rest, reporting what it
+removed. Override with `UIPATH_CODEDAPP_KEEP`; a value below 1 or non-numeric
+falls back to 3 with a warning.
+
+Per *name*, not per directory, because a repo packs a different app name per
+training target — `tc20260721-ca-workshop`, `ifca20260722-ca-workshop`, and so
+on. A global "keep the newest 3" would delete an older target's only package the
+moment you pack a different one, and `publish` is a separate command that runs
+against the local file, so that would break pack-now-publish-later. Grouping by
+name also guarantees the file the current run just produced survives.
+
+Local packages are build artifacts, not the deliverable: `publish` uploads to
+Orchestrator. `.uipath/` and `uipath.json` are gitignored in every content repo
+and must never be committed. Files in `.uipath/` that are not named
+`<name>.<semver>.nupkg` — including `app.config.json` and `metadata.json` — are
+left alone.
+
+## Extracting a workshop from a facilitator deck
+
+`workshop-kit extract-pptx` pulls screenshots, ordered text blocks and callout
+geometry out of a `.pptx` and writes a manifest beside them. Two workshops were
+built this way from a lab-guide deck.
+
+```bash
+npx workshop-kit extract-pptx \
+  --pptx ~/decks/5_\ CM\ Lab\ Guide.pptx \
+  --output-root static/img \
+  --manifest extraction/manifest.json \
+  --slide-map extraction/slide-map.json
+```
+
+Run it once without `--slide-map` first. Everything lands in
+`static/img/unassigned/`, which is what you want before you know where the
+exercise boundaries are. Then write the map and run it again:
+
+```json
+{
+  "deck": "5_ CM Lab Guide.pptx",
+  "pages": [
+    {"page": "pre-reqs", "slides": [2]},
+    {"page": "exercise-1", "slides": ["3-18"]},
+    {"page": "exercise-2", "slides": ["20-24"]}
+  ],
+  "roles": [
+    {"role": "answer-reveal", "match": ["answers"]},
+    {"role": "sign-in", "slides": [2]}
+  ]
+}
+```
+
+`schemas/pptx-slide-map.schema.json` has the full shape. The map is the *only*
+deck-specific input; it lives in the content repo, or nowhere at all once the
+docs are the source of truth, and the deck itself is never committed.
+
+Two things this tool exists to get right, both learned the hard way:
+
+- **Placeholder pictures count.** An image dropped into a PowerPoint content
+  placeholder is a `PlaceholderPicture` with `shape_type == PLACEHOLDER`, not
+  `PICTURE`. An earlier per-repo copy filtered on `shape_type` alone and silently
+  dropped 18 of 33 screenshots from one deck, with no error and no non-zero exit.
+- **Numbered callout ovals are separate shapes.** They vanish the moment a
+  screenshot is extracted on its own, so each is recorded as a percentage offset
+  inside the picture it overlaps, ready for `.workshop-click-marker` in MDX.
+
+`python-pptx` and `Pillow` are required, and are deliberately not project
+dependencies — this is a one-off authoring step, not part of any build. The
+command checks for them and prints the `pip install` line if they are absent.
+
 ## Why the components are compiled
 
 `npm run build` emits `src/components/*.tsx` to `dist/` as plain JS plus
@@ -134,9 +212,38 @@ against a `file:` link.
 
 ## Versioning
 
-- `agents/base.md` wording, or a new optional config field → **minor**
+- new CLI command, `agents/base.md` wording, or a new optional config field → **minor**
 - check or pipeline bug fix → **patch**
 - renamed component, removed config field, changed CLI flag → **major**
 
-Content repos pin a caret range and rely on Dependabot to surface kit releases,
-so a shared change is immediately CI-tested against every workshop.
+**The version number is a signal, not a trigger. Nothing updates on its own.**
+
+A content repo pins one exact tag:
+
+```json
+"@uipath-lab-tec/workshop-kit": "github:UiPath-LAB-TEC/workshop-kit#v1.3.0"
+```
+
+That is a tag, not a caret range, and it resolves through `package-lock.json` to
+a specific commit. Three consequences follow, and all three are deliberate:
+
+1. **Dependabot cannot bump it.** There is no registry to poll and no semver
+   range to compare for a `github:` tag dependency. The `dependabot.yml` in each
+   content repo covers `@docusaurus/*` and GitHub Actions only — a kit group
+   used to sit there doing nothing, which read as if the bumps were automatic.
+2. **`npm install` cannot bump it either.** The lockfile records the resolved
+   commit of the *previous* tag, so npm honours the lock, prints "changed 1
+   package", and keeps the old kit even after you edit `package.json`. See
+   "Releasing, and repinning consumers" above.
+3. **Only `workshop-kit repin <tag>` moves a repo**, and someone has to run it,
+   per repo, on purpose.
+
+So a **major** does not break every workshop the day it is tagged. It breaks the
+next repo that repins, whenever that is. A workshop already delivered can sit on
+an old tag indefinitely and keep building — which is the point, because a repo
+is often frozen mid-delivery while the kit moves on.
+
+The cost of that safety is that a shared fix is *not* live everywhere until you
+repin each repo. Cross-repo CI proves a change is safe; it does not deliver it.
+Treat "tag the kit" and "repin the consumers" as two separate jobs, and expect
+repos to sit on different tags in between.
