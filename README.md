@@ -33,7 +33,7 @@ template/                scaffold for `workshop-kit init` (a complete, building 
 workshop-kit prepare                  zip:downloads + doc-asset + workshop-var checks + agents build
 workshop-kit agents build             regenerate AGENTS.md from base + product
 workshop-kit agents check             fail if AGENTS.md is stale or hand-edited inside the fence
-workshop-kit check:tenant-access      advisory tenant permission report (never fails a build)
+workshop-kit check:tenant-access      advisory tenant permission + capacity report (never fails a build)
 workshop-kit build --target <name>
 workshop-kit codedapp <check|pack|publish|deploy|all>   pack prunes old nupkgs
 workshop-kit preview --target <name>
@@ -44,6 +44,113 @@ workshop-kit doctor [target]
 workshop-kit repin <tag>              move a content repo onto a released kit tag
 workshop-kit init --product <slug>
 ```
+
+## The tenant check
+
+`check:tenant-access` answers one question before a workshop is delivered: can
+this tenant actually run it? It reports two things.
+
+**Permissions.** Whether the `<tenant>-Participants` and `<tenant>-Facilitators`
+groups hold the Document Understanding, Data Fabric, Studio Web and folder roles
+the exercises need, and whether the IXP (`reinfer`) service is enabled. For a
+missing role it prints the `uip` command that grants it, and never runs it.
+
+The group names are a convention, and it is not universal. `<tenant>-Participants`
+and `<tenant>-Facilitators` is what the check looks for, but real training tenants
+also use `Workshop Participants`, `Workshop Trainers`, and per-cohort names like
+`Workshops CM-1` or `Workshop-OKC`. When the convention does not match, every group
+check reports "not found" — which reads as a permission problem but is really a
+naming mismatch, so check the tenant's actual groups with `uip admin groups list`
+before believing it.
+
+**Capacity.** AI Unit and Agent Unit headroom in the account, and every IXP quota
+the tenant reports. This is the half that catches "we ran out of units halfway
+through" and "nobody can create another dataset" on the morning of delivery
+rather than during it.
+
+Two notes on how the capacity numbers are read, both of which cost time to
+establish:
+
+- Headroom is derived, not read. `Available` is null for consumables in the
+  licence summary and `Allocated` is what the org handed to tenants, so neither
+  is the answer. The check subtracts consumption from `TotalUnitsInAccount`.
+- The two licence surfaces disagree, so the check reads both and takes the
+  larger consumption figure. On one org the summary reported 3,675,583 AI Units
+  consumed against the same 5,000,000 pool that the per-tenant rows summed to
+  1,796,083 — a 1.9M gap. Trusting the smaller number would have overstated
+  headroom 2.4x, in the one check whose job is to stop a workshop running out.
+  The gap is printed rather than hidden.
+
+**IXP quotas come from `re`, not `uip`.** They are a Reinfer concept, and `uip`
+cannot see them at all — `uip ixp` has no capacity command, and its project list
+returns only a count. `re get quotas` returns every kind with a real
+`hard_limit` and `current_max_usage`: `sources`, `datasets`, `buckets`,
+`comments`, `comments_per_source`, `integrations`, `triggers_per_dataset`,
+`extraction_predictions`. So no ceiling has to be declared — only the
+per-participant need.
+
+### Getting `re` credentials to the check
+
+The check finds the `re` context whose endpoint addresses the same org and tenant
+as the target, comparing the first two path segments (the endpoints differ only in
+a trailing `reinfer_` against `orchestrator_`). Contexts are read from the table
+`re config ls` prints, never from the file `re` stores them in — that file holds
+tokens.
+
+So the operator sets this up once, with `re`'s own supported command:
+
+```bash
+re config add --name <name> --endpoint https://cloud.uipath.com/<org>/<tenant>/reinfer_/ --token <token>
+```
+
+This is deliberately the only route. A token could instead live in
+`.env.deploy.<target>` and be materialised into a temporary `--config-file` —
+that works, and it was tried — but it puts this check in the business of handling
+a raw API key, writing it to disk, and depending on `re`'s config file format
+staying put. `re config add` is the supported way to hold Reinfer credentials, so
+the setup burden stays with the operator. It is a real burden: it is a manual step
+per tenant, and without it IXP quotas skip.
+
+### Skips are not warnings
+
+`re` ships separately from `uip` and most people building a workshop site will not
+have it. That is a fact about a laptop, not a finding about a tenant, so a missing
+`re` — or missing Reinfer credentials — is reported as `SKIP`, counted separately
+from warnings, and followed by a short note on how to make it run next time. A
+check that warns on every build is a check nobody reads.
+
+### Turning it on
+
+A target runs the check at build time when it sets `requiresTenantAccess`, and
+gets pass/warn thresholds instead of a bare readout when it declares `capacity`:
+
+```json
+"growth": {
+  "requiresTenantAccess": true,
+  "capacity": {
+    "participants": 25,
+    "aiUnitsPerParticipant": 2000,
+    "ixpQuotaPerParticipant": {"datasets": 1, "sources": 2}
+  }
+}
+```
+
+Every `capacity` field is optional and defaults to 0, which means "report the
+number, do not judge it". So a target that declares nothing still gets the full
+readout, and only a target that states what it needs can warn — an unconfigured
+repo never warns on a healthy tenant, which is how an advisory check earns being
+read. `validate-config` rejects unknown keys inside `capacity`, because
+`aiUnitsPerParticipants` — plural, one character off — would otherwise fall back
+to 0 and silently switch the AI Unit threshold off. The quota kinds inside
+`ixpQuotaPerParticipant` are deliberately *not* a closed set, since a new product
+quota kind would then fail every build; instead the check warns at run time when a
+declared kind is one the tenant does not report, and lists the kinds it does.
+
+Leave `requiresTenantAccess` off for `local`: an offline build must never depend
+on a reachable tenant. With it on, the check runs inside `build --target`, which
+means it also runs inside `codedapp pack` and `codedapp all`, since both build
+the site first. It cannot fail a deploy — a crash in the check (no `uip` on PATH,
+an unreachable tenant) is reported and the build continues.
 
 ## Releasing, and repinning consumers
 
@@ -87,9 +194,12 @@ jobs:
 ```
 
 It runs `agents check`, `validate-config`, `check:doc-assets`,
-`check:workshop-vars`, `typecheck`, a build, and `doctor`. Because the kit repo is
-private, it needs a `KIT_READ_TOKEN` secret that can read it, so npm can resolve
-the dependency.
+`check:workshop-vars`, `typecheck`, a build, and `doctor`. The kit repo is public,
+so `npm ci` resolves the `github:` dependency with no credentials and nothing
+needs to be passed in. The optional `KIT_READ_TOKEN` secret is a leftover from
+when the kit was private: `validate.yml` skips its auth step when the secret is
+absent, and no repo defines it, so `secrets: inherit` above passes nothing. It
+can be dropped from both once you are sure the kit stays public.
 
 `.github/workflows/kit-ci.yml` checks the kit itself, including end-to-end
 exercises of the two components that fail expensively: the `AGENTS.md` fence
@@ -139,6 +249,15 @@ on. A global "keep the newest 3" would delete an older target's only package the
 moment you pack a different one, and `publish` is a separate command that runs
 against the local file, so that would break pack-now-publish-later. Grouping by
 name also guarantees the file the current run just produced survives.
+
+Coded App names must be unique across the whole **organisation**, not merely
+within a folder or a tenant: deployed apps share one org-wide `*.uipath.host` URL
+space, and `baseUrl` must equal `/<codedApp.name>/`. Deploying a name another
+tenant already holds fails with `This app name is already deployed in this
+folder`, which names the wrong scope — the conflict is the URL, not the folder.
+A repo with no local `.uipath/` state does not fail early either: `publish`
+registers a *second* app of the same name in whichever tenant you happen to be
+logged into, and only the later `deploy` refuses.
 
 Local packages are build artifacts, not the deliverable: `publish` uploads to
 Orchestrator. `.uipath/` and `uipath.json` are gitignored in every content repo

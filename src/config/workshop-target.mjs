@@ -45,21 +45,21 @@ function deriveCodedAppName(config, target) {
 
 // The consumer repo, not the kit: this file runs from inside node_modules.
 const root = process.cwd();
-const configPath = path.join(root, 'config', 'workshop-targets.json');
-const targetOverlayDir = path.join(root, 'config', 'targets');
 
 /**
  * Reads config/workshop-targets.json, then merges any config/targets/<name>.json
  * overlay files in as additional targets. Ephemeral one-off training tenants can
  * live in their own file and be pruned without touching the main config.
  */
-function readTargetsConfig() {
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+export function readMergedTargetsConfig(configRoot = root) {
+  const mainPath = path.join(configRoot, 'config', 'workshop-targets.json');
+  const overlayDir = path.join(configRoot, 'config', 'targets');
+  const config = JSON.parse(fs.readFileSync(mainPath, 'utf8'));
 
-  if (!fs.existsSync(targetOverlayDir)) return config;
+  if (!fs.existsSync(overlayDir)) return config;
 
   config.targets = config.targets || {};
-  for (const entry of fs.readdirSync(targetOverlayDir).sort()) {
+  for (const entry of fs.readdirSync(overlayDir).sort()) {
     if (!entry.endsWith('.json')) continue;
     const name = entry.slice(0, -'.json'.length);
     if (config.targets[name]) {
@@ -67,13 +67,13 @@ function readTargetsConfig() {
         `Target "${name}" is defined both in config/workshop-targets.json and config/targets/${entry}.`,
       );
     }
-    config.targets[name] = JSON.parse(
-      fs.readFileSync(path.join(targetOverlayDir, entry), 'utf8'),
-    );
+    config.targets[name] = JSON.parse(fs.readFileSync(path.join(overlayDir, entry), 'utf8'));
   }
 
   return config;
 }
+
+const readTargetsConfig = readMergedTargetsConfig;
 
 export function getTargetName(explicitTarget) {
   const config = readTargetsConfig();

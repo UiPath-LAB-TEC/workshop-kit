@@ -12,6 +12,12 @@ export type WorkshopTarget = {
   baseUrl: string;
   /** Run the advisory tenant-access check for this target. Defaults to false. */
   requiresTenantAccess?: boolean;
+  capacity?: {
+    participants?: number;
+    aiUnitsPerParticipant?: number;
+    agentUnitsPerParticipant?: number;
+    ixpQuotaPerParticipant?: Record<string, number>;
+  };
   workshop: {
     uipathOrgName: string;
     uipathTenantName: string;

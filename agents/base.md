@@ -164,6 +164,92 @@ npm run build:target -- <target>
 
 - If a build prints environment or update-check warnings, treat them as non-fatal only when the build itself succeeds.
 
+### Tenant Checks And Build-Time Validation
+
+`check:tenant-access` is the advisory pre-delivery check: it reports whether the
+participant and facilitator groups hold the roles the exercises need, and whether
+the tenant has the AI Units and IXP quota headroom to survive the workshop. It
+runs inside `build:target` for any target that sets `requiresTenantAccess`, which
+means it also runs inside `codedapp pack` and `codedapp all`.
+
+The rules below were paid for by `ca-tenant-access-wiring.patch`: a hand-written
+patch that wired this same check up and was never applied. Every one of them is a
+mistake that patch made, and the check it wired had never executed once.
+
+- **A step that touches a live tenant is gated on the resolved target, never on
+  an npm lifecycle hook.** That patch put the check in `prebuild`, which fires on
+  any `npm run build` — including an offline build with no target argument. There
+  is no resolved target on that path, so the check falls back to `defaultTarget`
+  and validates whichever tenant that names, which is not the one being built.
+  Use `requiresTenantAccess` on the target instead, and leave it off for `local`.
+- **One step, one home.** That patch added the check in two places at once
+  (`prebuild` and the target runner). Two call sites for one decision drift, and
+  the one you are not looking at is the one that runs.
+- **An advisory check must not be able to fail a build.** Setting exit code 0
+  inside the script is not enough: that contract only holds while the script runs
+  at all. A crash before its own handler — an unresolvable import, no `uip` or
+  `re` on PATH, an unreachable tenant — exits non-zero, and a throwing caller
+  turns that into a failed deploy. Invoke advisory steps through a runner that
+  reports and continues. Shipping a workshop site must never depend on a
+  reachable tenant.
+- **Never leave a decision as a `.patch` file in the tree.** That one sat
+  unapplied long enough for the layout it targeted (flat `scripts/*.mjs`) to stop
+  existing in every repo, so it could not be applied even if someone wanted to.
+  Record the decision in `TODO.md` and make the change, or drop it.
+- **A check that never runs is worse than no check**, because it reads as
+  coverage. That one was referenced by the schema, reported on by `doctor`, and
+  documented — while dying on an unresolved import on every invocation. When
+  wiring up a validation step, run it and read its output before believing it.
+- **Syntax checks do not resolve imports.** `node --check` passes on a module
+  whose every import is broken, which is exactly how that import shipped. If CI
+  gates a script it never executes, gate its import edges too.
+
+### Quota And Licence Surfaces
+
+- **IXP quotas come from the `re` CLI, not `uip`.** They are a Reinfer concept.
+  `uip ixp` has no capacity command at all, and its project list returns only a
+  count. `re get quotas` returns each kind with a real `hard_limit` and
+  `current_max_usage` — `sources`, `datasets`, `buckets`, `comments`,
+  `comments_per_source`, `integrations`, `triggers_per_dataset`,
+  `extraction_predictions` — so no ceiling ever needs to be hand-declared.
+  Declare only the per-participant need.
+- **Discover limits, do not declare them.** A hand-written cap is a guess at a
+  number the tenant already knows, and it goes stale silently.
+- **Match a `re` context, do not pass `--endpoint`.** The API token lives in the
+  context. Find the context whose endpoint addresses the same org and tenant as
+  the workshop target; the two URLs differ only in a trailing `reinfer_` against
+  `orchestrator_`. Read contexts from what `re config ls` prints, never from the
+  file `re` stores them in — that file holds tokens.
+- **Cross-check licence figures before trusting headroom.** `uip platform
+  licenses summary` and `uip platform licenses consumables get` disagree: on one
+  org the summary reported 3,675,583 AI Units consumed against the same 5,000,000
+  pool that the per-tenant rows summed to 1,796,083. Take the larger consumption
+  figure and surface the gap. `Available` is null for consumables and `Allocated`
+  is what the org handed to tenants, so headroom must be derived from
+  `TotalUnitsInAccount` rather than read from a field.
+- **Missing local tooling is a skip, not a warning.** `re` installs separately
+  from `uip`, so most machines will not have it. Report that as a skipped check
+  with a note on how to enable it, counted apart from warnings. A check that
+  warns on every build is a check nobody reads, and it buries the real findings.
+- **Let a tool hold its own credentials.** IXP quotas need a `re` context, set up
+  once per tenant with `re config add`. Do not route an API key through
+  `.env.deploy.<target>` and a temporary config file to avoid that manual step:
+  it works, but it makes the check handle a raw key, write it to disk, and depend
+  on another tool's config format. Read contexts from `re config ls` output, never
+  from the file `re` stores them in -- that file holds tokens. Accept the setup
+  burden and skip cleanly when it is not done.
+- **Say how short, and what to raise it to.** A capacity warning that only reports
+  a shortfall leaves the reader to work out the number to put in a quota request.
+  Recommend current usage plus the full workshop need plus a margin — not the gap,
+  because existing usage does not go away, and a ceiling raised by only the gap
+  leaves zero headroom the moment the workshop ends.
+- **A threshold that silently defaults to off is a false pass.** Validate the
+  keys of any capacity or quota configuration. `aiUnitsPerParticipants` — plural,
+  one character off — otherwise falls back to 0 and turns the check off while
+  still reporting green. Where the key set cannot be closed (quota kinds are
+  discovered from the tenant), warn at run time about a declared key the tenant
+  does not report, and list the ones it does.
+
 ### Visual Design
 - Reports, dashboards, visual tools, and HTML pages should include a dark-mode option.
 - Workshop pages should be readable and utilitarian, not marketing-style landing pages.

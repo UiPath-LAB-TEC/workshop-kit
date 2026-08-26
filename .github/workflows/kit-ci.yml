@@ -60,6 +60,43 @@ jobs:
           # catch a syntax error in it before an author ran it against a deck.
           python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])" tools/extract-pptx-assets.py
 
+      # `node --check` is syntax-only: it never resolves an import, which is how
+      # check-tenant-access.mjs shipped importing '../config/workshop-target.mjs'
+      # as './workshop-target.mjs' and died with ERR_MODULE_NOT_FOUND on every
+      # run. Importing the modules for real is not an option -- some execute on
+      # load and would hit a live tenant from CI -- so the edges are resolved
+      # statically instead.
+      - name: Every relative import resolves
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const roots = ['bin', 'src', 'tools'];
+            const files = [];
+            const walk = (dir) => {
+              for (const e of fs.readdirSync(dir, {withFileTypes: true})) {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (/\.mjs\$/.test(e.name)) files.push(full);
+              }
+            };
+            for (const r of roots) if (fs.existsSync(r)) walk(r);
+            const failures = [];
+            for (const file of files) {
+              const src = fs.readFileSync(file, 'utf8');
+              for (const m of src.matchAll(/(?:from|import)\s*\(?\s*['\"](\.[^'\"]+)['\"]/g)) {
+                const target = path.resolve(path.dirname(file), m[1]);
+                if (!fs.existsSync(target)) failures.push(file + ' -> ' + m[1]);
+              }
+            }
+            if (failures.length) {
+              console.error('Unresolvable relative imports:');
+              for (const f of failures) console.error('- ' + f);
+              process.exit(1);
+            }
+            console.log(files.length + ' module(s) checked; every relative import resolves.');
+          "
+
       - name: CLI responds
         run: |
           node bin/workshop-kit.mjs --version
