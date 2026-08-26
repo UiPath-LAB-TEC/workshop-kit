@@ -166,6 +166,13 @@ npm run build:target -- <target>
 
 ### Tenant Checks And Build-Time Validation
 
+**Gate `requiresTenantAccess` on the tenant a target points at, not on its name.**
+A target called `growth` may address a real `uipathlabstraining` delivery tenant in
+one repo and the shared `growthuipath/Workshops` testing tenant in another. The
+group convention `<tenant>-Participants` / `<tenant>-Facilitators` holds only on
+the delivery tenants, so switching the check on for a testing target produces
+"group not found" on every build for names that were never expected to exist.
+
 `check:tenant-access` is the advisory pre-delivery check: it reports whether the
 participant and facilitator groups hold the roles the exercises need, and whether
 the tenant has the AI Units and IXP quota headroom to survive the workshop. It

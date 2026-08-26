@@ -55,13 +55,13 @@ groups hold the Document Understanding, Data Fabric, Studio Web and folder roles
 the exercises need, and whether the IXP (`reinfer`) service is enabled. For a
 missing role it prints the `uip` command that grants it, and never runs it.
 
-The group names are a convention, and it is not universal. `<tenant>-Participants`
-and `<tenant>-Facilitators` is what the check looks for, but real training tenants
-also use `Workshop Participants`, `Workshop Trainers`, and per-cohort names like
-`Workshops CM-1` or `Workshop-OKC`. When the convention does not match, every group
-check reports "not found" — which reads as a permission problem but is really a
-naming mismatch, so check the tenant's actual groups with `uip admin groups list`
-before believing it.
+`<tenant>-Participants` and `<tenant>-Facilitators` is the UiPath Labs convention,
+and it holds for the `uipathlabstraining` tenants that host real deliveries. It does
+**not** hold elsewhere: a testing tenant such as `growthuipath/Workshops` uses names
+like `Workshop Participants`, `Workshop Trainers` and `Workshops CM-1`, so every
+group check there reports "not found" — a naming mismatch that reads as a permission
+problem. That is the main reason to gate `requiresTenantAccess` on the tenant a
+target actually points at rather than on the target's name.
 
 **Capacity.** AI Unit and Agent Unit headroom in the account, and every IXP quota
 the tenant reports. This is the half that catches "we ran out of units halfway
