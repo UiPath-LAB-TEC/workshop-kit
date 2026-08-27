@@ -17,7 +17,7 @@
         "orchestratorParentFolder": "Shared"
       },
       "codedApp": {
-        "name": "workshop-__PRODUCT_SLUG__-local",
+        "name": "__PRODUCT_SLUG__-workshop-local",
         "description": "Local build of the __PRODUCT_TITLE__ Docusaurus site"
       }
     }
