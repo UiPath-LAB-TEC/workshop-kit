@@ -38,8 +38,10 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: npm
 
-      # The kit lives in a private repo, so plain `npm ci` cannot clone it with
-      # the default token. Rewrite the git URL to carry a token that can.
+      # Dormant while the kit repo is public: `npm ci` clones it with no auth and
+      # no repo defines this secret, so the step is skipped. Kept for the case
+      # where the kit goes private again, when the default token cannot clone it
+      # and the git URL must carry one that can.
       # The `secrets` context is not available in a step-level `if`, so the token
       # is mapped to env first and the condition tests that.
       - name: Authenticate to the kit repo
