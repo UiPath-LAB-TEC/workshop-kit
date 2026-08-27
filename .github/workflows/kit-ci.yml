@@ -60,6 +60,43 @@ jobs:
           # catch a syntax error in it before an author ran it against a deck.
           python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])" tools/extract-pptx-assets.py
 
+      # `node --check` is syntax-only: it never resolves an import, which is how
+      # check-tenant-access.mjs shipped importing '../config/workshop-target.mjs'
+      # as './workshop-target.mjs' and died with ERR_MODULE_NOT_FOUND on every
+      # run. Importing the modules for real is not an option -- some execute on
+      # load and would hit a live tenant from CI -- so the edges are resolved
+      # statically instead.
+      - name: Every relative import resolves
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const roots = ['bin', 'src', 'tools'];
+            const files = [];
+            const walk = (dir) => {
+              for (const e of fs.readdirSync(dir, {withFileTypes: true})) {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (/\.mjs\$/.test(e.name)) files.push(full);
+              }
+            };
+            for (const r of roots) if (fs.existsSync(r)) walk(r);
+            const failures = [];
+            for (const file of files) {
+              const src = fs.readFileSync(file, 'utf8');
+              for (const m of src.matchAll(/(?:from|import)\s*\(?\s*['\"](\.[^'\"]+)['\"]/g)) {
+                const target = path.resolve(path.dirname(file), m[1]);
+                if (!fs.existsSync(target)) failures.push(file + ' -> ' + m[1]);
+              }
+            }
+            if (failures.length) {
+              console.error('Unresolvable relative imports:');
+              for (const f of failures) console.error('- ' + f);
+              process.exit(1);
+            }
+            console.log(files.length + ' module(s) checked; every relative import resolves.');
+          "
+
       - name: CLI responds
         run: |
           node bin/workshop-kit.mjs --version
@@ -127,6 +164,92 @@ jobs:
           grep -q 'keep={{WORKSHOP_UNDECLARED}}' "$work/got.txt" || { echo 'FAIL: undeclared token should stay literal'; exit 1; }
           grep -q '{{WORKSHOP_UIPATH_ORG_NAME}}' "$work/downloads/project/AGENTS.md" || { echo 'FAIL: source file was mutated'; exit 1; }
           echo 'zip pipeline OK'
+
+      # Derivation is the only reason two targets can silently share an app name, so
+      # the uniqueness guard is tested alongside it. `local` and a hosted target
+      # normally point at the SAME tenant, which is exactly the colliding shape.
+      - name: Coded App name derives from productSlug and tenant, uniquely
+        run: |
+          set -e
+          work="$(mktemp -d)"; mkdir -p "$work/config"
+          # $1 = extra top-level JSON, $2 = local's codedApp body, $3 = growth's
+          write() {
+            cat > "$work/config/workshop-targets.json" <<JSON
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"growth",$1
+           "targets":{
+            "local":{"siteUrl":"http://x","baseUrl":"/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{$2"description":"d"}},
+            "growth":{"siteUrl":"http://y","baseUrl":"/g/","workshop":{"uipathOrgName":"o","uipathTenantName":"Bellevue_July2026_20260727","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{$3"description":"d"}}}}
+          JSON
+          }
+          run() { ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check "$1" 2>&1 ); }
+
+          # derives, and normalises underscores + case
+          write '"productSlug":"ixp",' '"name":"ixp-local",' ''
+          run growth | grep -q 'Coded App name: ixp-bellevue-july2026-20260727' \
+            || { echo 'FAIL: did not derive/normalise'; exit 1; }
+
+          # an explicit name always wins
+          write '"productSlug":"ixp",' '"name":"ixp-local",' '"name":"hand-written",'
+          run growth | grep -q 'Coded App name: hand-written' || { echo 'FAIL: explicit name ignored'; exit 1; }
+
+          # no productSlug and no name is still a missing-field error
+          write '' '"name":"ixp-local",' ''
+          run growth 2>&1 | grep -q 'missing required fields: codedApp.name' \
+            || { echo 'FAIL: absent name not reported'; exit 1; }
+
+          # a derived name over 32 fails, and says it was derived
+          write '"productSlug":"case-management",' '"name":"cm-local",' ''
+          out="$(run growth)" && { echo 'FAIL: over-long derived name accepted'; exit 1; }
+          echo "$out" | grep -q 'derived from productSlug' || { echo 'FAIL: error does not say it was derived'; exit 1; }
+
+          # two targets resolving to one name is refused (same tenant, both derived)
+          cat > "$work/config/workshop-targets.json" <<'JSON'
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"growth","productSlug":"ixp",
+           "targets":{
+            "local":{"siteUrl":"http://x","baseUrl":"/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{"description":"d"}},
+            "growth":{"siteUrl":"http://y","baseUrl":"/g/","workshop":{"uipathOrgName":"o","uipathTenantName":"Workshops","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},"codedApp":{"description":"d"}}}}
+          JSON
+          out="$(run growth)" && { echo 'FAIL: colliding app names accepted'; exit 1; }
+          echo "$out" | grep -q 'both resolve to codedApp.name' || { echo 'FAIL: collision not reported'; exit 1; }
+          echo 'name derivation OK'
+
+      # The 32-char Coded App name limit is enforced in validateTarget, which every
+      # command path reaches. It matters because `uip codedapp publish` ACCEPTS an
+      # over-long name and only `deploy` refuses it, leaving an orphan package in
+      # Orchestrator -- so the failure has to happen locally, before either runs.
+      - name: Coded App name length is enforced at the 32-char boundary
+        run: |
+          set -e
+          work="$(mktemp -d)"
+          mkdir -p "$work/config"
+          write_target() {
+            cat > "$work/config/workshop-targets.json" <<JSON
+          {"title":"F","tagline":"t","repo":"o/r","docsLabel":"D","defaultTarget":"local",
+           "targets":{"local":{"siteUrl":"http://localhost:3000","baseUrl":"/",
+           "workshop":{"uipathOrgName":"o","uipathTenantName":"t","uipathTenantUrl":"u","orchestratorParentFolder":"Shared"},
+           "codedApp":{"name":"$1","description":"d"}}}}
+          JSON
+          }
+          n32="$(printf 'a%.0s' $(seq 1 32))"
+          n33="$(printf 'a%.0s' $(seq 1 33))"
+
+          write_target "$n32"
+          ( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check >/dev/null 2>&1 ) \
+            || { echo 'FAIL: a 32-character name was rejected'; exit 1; }
+
+          write_target "$n33"
+          out="$( cd "$work" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" codedapp check 2>&1 )" && {
+            echo 'FAIL: a 33-character name was accepted'; exit 1; }
+          echo "$out" | grep -q '33 characters' || { echo 'FAIL: error does not report the length'; exit 1; }
+
+          # init must refuse a slug that would blow the budget in any standard pattern.
+          slugdir="$(mktemp -d)"
+          ( cd "$slugdir" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" init --product communications-mining >/dev/null 2>&1 ) && {
+            echo 'FAIL: init accepted a 21-character slug'; exit 1; }
+          [ -z "$(ls -A "$slugdir")" ] || { echo 'FAIL: init left files behind after rejecting'; exit 1; }
+          ( cd "$slugdir" && node "$GITHUB_WORKSPACE/bin/workshop-kit.mjs" init --product comms-mining >/dev/null 2>&1 ) \
+            || { echo 'FAIL: init rejected a 12-character slug'; exit 1; }
+          echo 'name length rules OK'
 
       # This prune DELETES files from static/downloads/, so it is covered the same
       # way. The regression it guards: static/downloads/ is gitignored, so a stale

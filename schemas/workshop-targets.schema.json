@@ -70,6 +70,12 @@
     "docsLabel": {
       "type": "string",
       "description": "Footer Docs link label. Defaults to 'Workshop Docs'."
+    },
+    "productSlug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "maxLength": 15,
+      "description": "Product slug used to derive codedApp.name as <productSlug>-<uipathTenantName> for any target that does not set one explicitly. Capped at 15 so the derived name fits the 32-character limit for typical tenant names."
     }
   },
   "definitions": {
@@ -96,6 +102,39 @@
           "type": "boolean",
           "default": false,
           "description": "When true, build:target runs the advisory tenant-access check for this target. Left false, local and offline builds never touch a live tenant."
+        },
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "What this workshop needs from the tenant, used by check:tenant-access to turn raw quota numbers into a pass or a warning. Every field is optional and defaults to 0, which means \"report the number without judging it\" -- so a target that declares nothing still gets the readout, and only a target that states its needs can warn.",
+          "properties": {
+            "participants": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Expected number of participants. Multiplies every per-participant figure below; leave unset and no threshold is applied."
+            },
+            "aiUnitsPerParticipant": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "AI Units one participant is expected to burn across the whole workshop. Warns when account headroom is below participants x this."
+            },
+            "agentUnitsPerParticipant": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Agent Units one participant is expected to burn. Warns when account headroom is below participants x this."
+            },
+            "ixpQuotaPerParticipant": {
+              "type": "object",
+              "description": "Per-participant need for each IXP quota kind, keyed by the kind as `re get quotas` reports it (sources, datasets, buckets, comments, comments_per_source, integrations, triggers_per_dataset, extraction_predictions). The hard limits are discovered from the tenant, so only the need is declared here. A key the tenant does not report is warned about rather than ignored, since it is almost always a typo.",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
         },
         "workshop": {
           "type": "object",
@@ -127,14 +166,13 @@
         },
         "codedApp": {
           "type": "object",
-          "required": [
-            "name"
-          ],
           "additionalProperties": false,
           "properties": {
             "name": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "maxLength": 32,
+              "description": "Optional when the config sets productSlug: then it defaults to <productSlug>-<uipathTenantName>. An explicit value always wins, which is the escape hatch for tenant names too long to fit. Hard limit: uip codedapp deploy rejects names over 32 characters."
             },
             "description": {
               "type": "string"

@@ -54,16 +54,6 @@
   background: var(--ifm-background-color);
 }
 
-.workshop-component-visual {
-  margin: 1.5rem 0;
-}
-
-.workshop-component-visual img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
-
 .workshop-annotation-media {
   position: relative;
 }
@@ -72,7 +62,7 @@
   width: 100%;
 }
 
-.workshop-new-chat-crop {
+.workshop-image-crop {
   position: relative;
   width: min(420px, 100%);
   height: 170px;
@@ -82,7 +72,7 @@
   background: var(--ifm-background-color);
 }
 
-.workshop-new-chat-crop img {
+.workshop-image-crop img {
   width: 760px;
   max-width: none;
   border: 0;
