@@ -21,8 +21,9 @@ import process from 'node:process';
 
 const kitRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-// `staging-<slug>-workshop` is the tightest standard pattern at 17 characters of
-// fixed text, against a 32-character Coded App name limit.
+// Coded App names follow `<slug>-workshop-<target>`: 10 characters of fixed text
+// against a 32-character limit, leaving 22 to share between the slug and the target
+// name. Reserving 7 for the target -- the longest in use -- caps the slug at 15.
 const PRODUCT_SLUG_LIMIT = 15;
 const templateDir = join(kitRoot, 'template');
 
@@ -67,16 +68,15 @@ export function init({product, title, root = process.cwd()} = {}) {
   }
   // Caught here rather than at deploy time. The slug ends up inside every target's
   // codedApp.name, and `uip codedapp deploy` refuses a name over 32 characters --
-  // after `publish` has already accepted it and left a package behind. The tightest
-  // standard pattern is `staging-<slug>-workshop`, which spends 17 on fixed text.
+  // after `publish` has already accepted it and left a package behind. The pattern
+  // is `<slug>-workshop-<target>`, 10 characters of fixed text plus the target name.
   if (product.length > PRODUCT_SLUG_LIMIT) {
     console.error(
       `"${product}" is ${product.length} characters; keep the product slug to ${PRODUCT_SLUG_LIMIT}.\n` +
         `  Coded App names are capped at 32 and the slug goes inside all of them:\n` +
-        `    workshop-${product}-local        ${`workshop-${product}-local`.length}\n` +
-        `    growth-${product}-workshop       ${`growth-${product}-workshop`.length}\n` +
-        `    staging-${product}-workshop      ${`staging-${product}-workshop`.length}\n` +
-        `  Abbreviate the slug, not the prefix: "comms-mining", not "communications-mining".`,
+        `    ${product}-workshop-local        ${`${product}-workshop-local`.length}\n` +
+        `    ${product}-workshop-growth       ${`${product}-workshop-growth`.length}\n` +
+        `  Abbreviate the slug, not the fixed part: "comms-mining", not "communications-mining".`,
     );
     return 1;
   }

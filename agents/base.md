@@ -30,6 +30,13 @@ change the convention here and roll it out everywhere.
   into the same list. A `## Recap` after it is optional, for a short narrative
   wrap-up where one genuinely adds something. An up-front `## Requirements` or
   `## Objectives` section is a different thing and may stay.
+- **A Coded App is named `<slug>-workshop-<target>`.** The product slug first,
+  then the literal `workshop`, then the target it is built for: `ixp-workshop-growth`,
+  `case-management-workshop-local`, `comms-mining-workshop-growth`. The variable
+  part goes last so that every app for one product sorts together and reads as the
+  same workshop. Do not put the environment first -- `growth-ixp-workshop` is the
+  old shape and is being retired -- and do not introduce new `staging` targets;
+  the one that exists predates this rule.
 - **Coded App names are derived, and must fit 32 characters.** A target that omits
   `codedApp.name` gets `<productSlug>-<uipathTenantName>`, normalised to lowercase
   hyphens. The name is derived at config load rather than stored, so it cannot drift
@@ -41,18 +48,22 @@ change the convention here and roll it out everywhere.
   by a date suffix truncate to the same name and would overwrite each other's app.
   Two targets may never resolve to the same name, which matters because `local` and
   a hosted target usually share a tenant -- give at least one of them an explicit
-  name.
+  name. Note that the derived shape,
+  `<productSlug>-<tenant>`, predates the naming convention above and does not match
+  it, so every current target sets `codedApp.name` explicitly.
 - **Keep the product slug to 15 characters.**
   `uip codedapp deploy` rejects a name over 32 characters, and `baseUrl` must
-  always equal `/<codedApp.name>/`, so the two move together. The standard
-  patterns spend most of the budget on fixed text: `workshop-<slug>-local` costs
-  15, `growth-<slug>-workshop` 16, and `staging-<slug>-workshop` 17. A 15-character
-  slug therefore fits every pattern; `case-management` is already at exactly 32 for
-  its staging form. Abbreviate in the slug rather than the prefix -- `comms-mining`,
-  not `communications-mining` -- because the prefix is what participants recognise
-  across workshops. `publish` happily accepts an over-long name and only `deploy`
-  refuses it, which leaves an orphan package behind, so `doctor` fails on this
-  first.
+  always equal `/<codedApp.name>/`, so the two move together. `-workshop-` spends
+  10 characters, leaving 22 to share between the slug and the target name. A
+  15-character slug therefore leaves 7 for the target, which covers `local`,
+  `growth` and the retired `staging`; `case-management-workshop-staging` is exactly
+  32. Abbreviate in the slug rather than the fixed part -- `comms-mining`, not
+  `communications-mining` -- because `<slug>-workshop` is what participants
+  recognise across workshops. A delivery target whose name carries a date or a city
+  overflows the limit and keeps a shortened explicit `codedApp.name` instead, which
+  is what the dated training targets do. `publish` happily accepts an over-long
+  name and only `deploy` refuses it, which leaves an orphan package behind, so
+  `doctor` fails on this first.
 - **Participant placeholders use angle brackets:** `<your-name>`, and
   `<your-initials>` where initials specifically are wanted. Never `[participant
   name]`, `[your-name]`, or `{{your-name}}`. Angle brackets read as replace-me and
