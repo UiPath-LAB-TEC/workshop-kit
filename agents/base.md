@@ -51,10 +51,17 @@ change the convention here and roll it out everywhere.
   name. Note that the derived shape,
   `<productSlug>-<tenant>`, predates the naming convention above and does not match
   it, so every current target sets `codedApp.name` explicitly.
+- **`baseUrl` equals `/<codedApp.name>/` on every hosted target.** The two always
+  move together: Docusaurus compiles `baseUrl` into every asset path and the app is
+  served at `/<name>/`, so a build and a deploy that disagree give you a site where
+  every asset 404s. Renaming a hosted app is therefore also a `baseUrl` change, a
+  new participant URL, and a redeploy. The `local` target is the one exception --
+  it keeps `baseUrl: "/"` so `npm run start` serves at the root of `localhost`.
+  That is safe because `local` is never deployed, and the rule exists only to stop
+  a build and a deploy from disagreeing.
 - **Keep the product slug to 15 characters.**
-  `uip codedapp deploy` rejects a name over 32 characters, and `baseUrl` must
-  always equal `/<codedApp.name>/`, so the two move together. `-workshop-` spends
-  10 characters, leaving 22 to share between the slug and the target name. A
+  `uip codedapp deploy` rejects a name over 32 characters, and `-workshop-` already
+  spends 10 of them, leaving 22 to share between the slug and the target name. A
   15-character slug therefore leaves 7 for the target, which covers `local`,
   `growth` and the retired `staging`; `case-management-workshop-staging` is exactly
   32. Abbreviate in the slug rather than the fixed part -- `comms-mining`, not
