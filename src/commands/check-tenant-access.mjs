@@ -4,7 +4,14 @@ import process from 'node:process';
 import {getTarget} from '../config/workshop-target.mjs';
 
 const PREFIX = '[tenant-access]';
-const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * Generous on purpose. Against growthuipath/Workshops the licence consumables
+ * call took 8s and `re get quotas` 12s when warm, but both exceeded 30s on a
+ * cold run -- and a timeout here does not slow the check down, it deletes a
+ * resource from the report and labels it "Unable to query", which reads as a
+ * finding about the tenant rather than about the connection.
+ */
+const DEFAULT_TIMEOUT_MS = 90_000;
 let passCount = 0;
 let warningCount = 0;
 let skipCount = 0;
@@ -50,8 +57,10 @@ function reportCheck({group, permission, expected, actual, passed, commands = []
     Result: passed ? 'PASS' : 'WARN',
   });
 
+  // Same rule as reportCapacity: the table below is where a passing check is
+  // read, so a pass is counted and not also narrated.
   if (passed) {
-    pass(`${group} ${permission}: ${actual}.`);
+    passCount += 1;
   } else {
     warn(`${group} ${permission}: expected ${expected}; found ${actual}.`);
     if (commands.length > 0 || advice) {
@@ -77,12 +86,38 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
+/**
+ * Whether a failed attempt is worth repeating.
+ *
+ * Both shapes seen against a healthy tenant are transient: the CLI being killed
+ * at the timeout, and a success exit whose stdout is not the JSON envelope. A
+ * genuine finding -- a missing role, an absent group -- comes back as a
+ * well-formed envelope and is never retried.
+ */
+function isTransientFailure(result) {
+  if (result.error) return true;
+  if (result.status !== 0) return false;
+  try {
+    JSON.parse(result.stdout);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function runUip(label, args) {
-  const result = spawnSync('uip', [...args, '--output', 'json', '--log-level', 'error'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    timeout: DEFAULT_TIMEOUT_MS,
-  });
+  const invoke = () =>
+    spawnSync('uip', [...args, '--output', 'json', '--log-level', 'error'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      timeout: DEFAULT_TIMEOUT_MS,
+    });
+
+  // One retry, because reporting "Unable to query" for a resource that is
+  // simply slow is worse than the extra second: it reads as a finding about the
+  // tenant, and it silently drops that resource from the report entirely.
+  let result = invoke();
+  if (isTransientFailure(result)) result = invoke();
 
   if (result.error) {
     warn(`${label}: could not run the UiPath CLI (${result.error.message}).`);
@@ -426,6 +461,24 @@ const CAPACITY_DEFAULTS = {
 };
 
 /**
+ * The IXP quota kinds worth reporting, out of the eight `re get quotas` returns.
+ *
+ * What decides a workshop's IXP readiness is whether there is room for the
+ * projects and datasets participants create. The other six kinds --
+ * `comments`, `comments_per_source`, `integrations`, `triggers_per_dataset`,
+ * `buckets` and `extraction_predictions` -- are not relevant to any workshop we
+ * deliver, and printing them padded the report with eight rows where two carry
+ * the decision.
+ *
+ * `buckets` is the one to be careful about re-adding: it is a Reinfer bucket
+ * holding raw comments, an entirely different resource from the Orchestrator
+ * storage buckets participants create in the coding-agents workshop. On
+ * growthuipath/Workshops the two read 11 and 26 respectively, so this quota
+ * says nothing about Orchestrator capacity.
+ */
+const REPORTED_QUOTA_KINDS = new Set(['sources', 'datasets']);
+
+/**
  * The licence summary covers every unit code in one response, so it is fetched
  * once and reused rather than re-requested per unit on every build.
  */
@@ -469,23 +522,47 @@ function recommendedQuotaLimit({limit, used, need}) {
   return Math.ceil(target / magnitude) * magnitude;
 }
 
-function reportCapacity({resource, metric, need, have, passed, recommend = null, commands = []}) {
+/**
+ * Records one capacity row, and streams a line only when it is a warning.
+ *
+ * Each row is printed once, by the summary table in the `finally` block --
+ * which always runs, so the table survives a crash mid-check. Echoing every
+ * healthy resource inline as well restated the same fact in a second shape and
+ * buried the one row that needed attention. The usage context that used to
+ * live in those inline lines is carried by the `Used` column instead, so
+ * nothing is lost: a resource at 72% of its ceiling still reads as such even
+ * though it passes.
+ */
+function reportCapacity({
+  resource,
+  metric,
+  need,
+  have,
+  passed,
+  recommend = null,
+  commands = [],
+  used = null,
+  limit = null,
+  unavailable = false,
+}) {
   capacityResults.push({
     Resource: resource,
     Metric: metric,
     Needed: need === null ? 'not declared' : formatUnits(need),
-    Available: formatUnits(have),
+    Available: unavailable ? 'unavailable' : formatUnits(have),
+    Used:
+      unavailable || limit === null
+        ? ''
+        : `${formatUnits(used)} of ${formatUnits(limit)} (${percentUsed(used, limit)})`,
     Short: passed === false && need !== null ? formatUnits(need - have) : '',
     'Raise to': recommend === null ? '' : formatUnits(recommend),
-    Result: passed === null ? 'INFO' : passed ? 'PASS' : 'WARN',
+    Result: unavailable ? 'UNKNOWN' : passed === null ? 'INFO' : passed ? 'PASS' : 'WARN',
   });
 
-  if (passed === null) {
-    console.log(`${PREFIX} INFO  ${resource} ${metric}: ${formatUnits(have)} available.`);
-    return;
-  }
+  if (unavailable) return;
+  if (passed === null) return;
   if (passed) {
-    pass(`${resource} ${metric}: ${formatUnits(have)} available, ${formatUnits(need)} needed.`);
+    passCount += 1;
     return;
   }
   warn(
@@ -578,13 +655,20 @@ function readConsumable(unitCode, unitLabel, tenantName) {
 function checkConsumable({unitCode, unitLabel, tenantName, perParticipant, participants}) {
   const usage = readConsumable(unitCode, unitLabel, tenantName);
   if (!usage) {
-    reportCheck({
-      group: 'Tenant',
-      permission: `${unitLabel} licensing`,
-      expected: 'A consumables report',
-      actual: 'Unable to query',
-      passed: false,
+    // A licence read that failed is a missing capacity row, not a permission
+    // finding. Reporting it in the permission table put "Agent Units licensing"
+    // beside role assignments and, worse, left the capacity table silently
+    // short a resource -- so the one thing the reader needed to notice, that
+    // Agent Units went unchecked, was in the other table.
+    reportCapacity({
+      resource: unitLabel,
+      metric: 'remaining in account',
+      need: null,
+      have: 0,
+      passed: null,
+      unavailable: true,
     });
+    warn(`${unitLabel}: the consumables report could not be read, so headroom is unverified.`);
     return;
   }
 
@@ -595,17 +679,11 @@ function checkConsumable({unitCode, unitLabel, tenantName, perParticipant, parti
     need,
     have: usage.remaining,
     passed: need === null ? null : usage.remaining >= need,
+    // The account total is this unit's ceiling, so consumed-of-total reads the
+    // same way a quota's used-of-limit does and lands in the same column.
+    used: usage.consumed,
+    limit: usage.total,
   });
-
-  console.log(
-    `${PREFIX} INFO  ${unitLabel}: ${formatUnits(usage.total)} in the account, ` +
-      `${formatUnits(usage.consumed)} consumed org-wide` +
-      (usage.tenantConsumed === null
-        ? `, no consumption recorded for ${tenantName}`
-        : `, ${formatUnits(usage.tenantConsumed)} by ${tenantName}`) +
-      (usage.endDate ? `; bundle ends ${String(usage.endDate).slice(0, 10)}` : '') +
-      '.',
-  );
 
   // Rounded, not exact: the API returns fractional units, and the two surfaces
   // agreeing to the unit still differ in the last float bit (149514.99999999997
@@ -814,6 +892,7 @@ function checkIxpQuotas({target, participants, perParticipant, tenantId}) {
     const kind = String(value(quota, 'quota_kind') || '');
     if (!kind) continue;
     seen.add(kind);
+    if (!REPORTED_QUOTA_KINDS.has(kind)) continue;
 
     const limit = number(value(quota, 'hard_limit'));
     const used = number(value(quota, 'current_max_usage'));
@@ -833,6 +912,8 @@ function checkIxpQuotas({target, participants, perParticipant, tenantId}) {
       // put a number in a quota request, and it must cover current usage plus
       // the whole workshop, not just the gap.
       recommend: short ? recommendedQuotaLimit({limit, used, need}) : null,
+      used,
+      limit,
       commands:
         short && tenantId
           ? [
@@ -841,19 +922,24 @@ function checkIxpQuotas({target, participants, perParticipant, tenantId}) {
             ]
           : [],
     });
-    console.log(
-      `${PREFIX} INFO  IXP ${kind}: ${formatUnits(used)} of ${formatUnits(limit)} used ` +
-        `(${percentUsed(used, limit)} of the limit).`,
-    );
   }
 
-  // A declared need for a quota kind the tenant does not report is almost
-  // always a typo, and it would otherwise pass silently as an unchecked need.
+  // A declared need that never gets checked would otherwise pass silently, so
+  // both ways of getting one are called out. A kind the tenant does not report
+  // at all is almost always a typo; a kind it reports but this check
+  // deliberately ignores is a config that expects a judgement it will not get.
   for (const kind of Object.keys(perParticipant)) {
-    if (number(perParticipant[kind]) > 0 && !seen.has(kind)) {
+    if (!(number(perParticipant[kind]) > 0)) continue;
+    if (!seen.has(kind)) {
       warn(
         `IXP quotas: capacity.ixpQuotaPerParticipant declares "${kind}", but this tenant reports ` +
           `no such quota. Known kinds here: ${[...seen].sort().join(', ') || 'none'}.`,
+      );
+    } else if (!REPORTED_QUOTA_KINDS.has(kind)) {
+      warn(
+        `IXP quotas: capacity.ixpQuotaPerParticipant declares "${kind}", which this check no ` +
+          `longer reports. Remove it, or add it to REPORTED_QUOTA_KINDS. Reported kinds: ` +
+          `${[...REPORTED_QUOTA_KINDS].sort().join(', ')}.`,
       );
     }
   }
